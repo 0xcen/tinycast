@@ -244,8 +244,8 @@ enum SettingsSearchCatalog {
             .quicklinksBehaviour, "Open in a new window",
             keywords: ["browser", "tab"]),
         .init(
-            .quicklinksBehaviour, "When there's no selected text",
-            keywords: ["selection", "fallback", "placeholder"]),
+            .quicklinksBehaviour, "Pass selected text as argument",
+            keywords: ["selection", "hotkey", "shortcut", "argument"]),
         .init(
             .quicklinksBehaviour, "Confirm before deleting",
             keywords: ["ask", "delete", "prompt"]),

@@ -64,7 +64,7 @@ enum SettingsFileSchema {
         case .quicklinksEnabled: return bind(settings, \.quicklinksEnabled)
         case .quicklinksShowInLauncher: return bind(settings, \.quicklinksShowInLauncher)
         case .quicklinkOpensNewWindow: return bind(settings, \.quicklinkOpensNewWindow)
-        case .quicklinkSelectionFallback: return bind(settings, \.quicklinkSelectionFallback)
+        case .quicklinkPassesSelectedText: return bind(settings, \.quicklinkPassesSelectedText)
         case .quicklinkConfirmsBeforeDelete: return bind(settings, \.quicklinkConfirmsBeforeDelete)
         case .quicklinkCommands: return launcher.commandsBinding(for: key, owner: .quicklinks)
         case .appleShortcutsEnabled: return bind(settings, \.appleShortcutsEnabled)
@@ -165,7 +165,6 @@ extension HyperKeyPhysicalKey: SettingsFileRawValue {}
 extension HyperKeyQuickPress: SettingsFileRawValue {}
 extension CalcNumberStyle: SettingsFileRawValue {}
 extension SearchSensitivity: SettingsFileRawValue {}
-extension QuicklinkSelectionFallback: SettingsFileRawValue {}
 extension WindowCycle: SettingsFileRawValue {}
 extension ClipboardDefaultAction: SettingsFileRawValue {}
 extension EmojiSkinTone: SettingsFileRawValue {}
