@@ -173,7 +173,7 @@ final class AppSettings {
         }
     }
 
-    /// The physical key remapped to the Hyper chord; `HyperKeyTap` reacts via its observer.
+    /// The physical key remapped to the Hyper chord; `HyperKeyManager` reacts via its observer.
     var hyperKey: HyperKeyPhysicalKey {
         didSet { defaults.set(hyperKey.rawValue, forKey: Key.hyperKey.rawValue) }
     }
@@ -186,6 +186,14 @@ final class AppSettings {
     var hyperKeyQuickPress: HyperKeyQuickPress {
         didSet {
             defaults.set(hyperKeyQuickPress.rawValue, forKey: Key.hyperKeyQuickPress.rawValue)
+        }
+    }
+
+    var hyperKeySecureInputCompatibility: Bool {
+        didSet {
+            defaults.set(
+                hyperKeySecureInputCompatibility,
+                forKey: Key.hyperKeySecureInputCompatibility.rawValue)
         }
     }
 
@@ -657,6 +665,8 @@ final class AppSettings {
             defaults.string(forKey: Key.hyperKeyQuickPress.rawValue)
             .flatMap(HyperKeyQuickPress.init)
             ?? .none
+        hyperKeySecureInputCompatibility = defaults.bool(
+            forKey: Key.hyperKeySecureInputCompatibility.rawValue)
         emojiSkinTone =
             defaults.string(forKey: Key.emojiSkinTone.rawValue).flatMap(EmojiSkinTone.init) ?? .none
         emojiGridColumns =

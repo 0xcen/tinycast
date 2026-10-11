@@ -164,6 +164,9 @@ enum SettingsSearchCatalog {
             .generalHyperKey, "Include Shift (⇧)",
             keywords: ["modifier", "chord"]),
         .init(
+            .generalHyperKey, "Secure Input Compatibility",
+            keywords: ["password", "secure input", "right control"]),
+        .init(
             .generalCalculator, "Number format",
             keywords: ["decimal", "comma", "separator", "locale", "region", "thousands"]),
         .init(
