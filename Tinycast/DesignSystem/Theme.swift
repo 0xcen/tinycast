@@ -222,7 +222,7 @@ enum Theme {
         static let aiChatSearchField: CGFloat = 28
         static let aiChatDetailMinimum: CGFloat = 440
         /// The transcript and composer column; past this a line of prose stops being readable.
-        static let aiChatReadingWidth: CGFloat = 760
+        static let aiChatReadingWidth: CGFloat = 960
         static let aiChatComposerMaxLines: CGFloat = 15
         static let aiChatComposerHeightFraction: CGFloat = 0.30
         /// Every control on the composer's row, Send included, so the row reads as one line.
@@ -233,6 +233,7 @@ enum Theme {
         /// A source chip's title before it middle-truncates, so three chips share a row.
         static let chatSourceTitle: CGFloat = 200
         static let chatSourceBadge: CGFloat = 18
+        static let chatJumpToLatest: CGFloat = 30
         /// The context card's width: a label column and a value one, with room for a model name.
         static let chatContextCard: CGFloat = 300
         /// A grouped `Form` row's control height.

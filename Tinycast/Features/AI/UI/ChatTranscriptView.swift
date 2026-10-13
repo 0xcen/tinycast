@@ -48,6 +48,7 @@ struct ChatTranscriptView: View {
                         let isLast = message.id == messages.last?.id
                         ChatMessageView(
                             message: message,
+                            surface: surface,
                             status: isLast ? status : nil,
                             onRegenerate: isLast && message.role == .assistant
                                 ? onRegenerate : nil,
@@ -68,15 +69,15 @@ struct ChatTranscriptView: View {
                         .frame(height: metrics.spacing.xxs)
                         .id("ai-transcript-tail")
                 }
-                .padding(.horizontal, metrics.spacing.xxl)
                 .padding(.top, metrics.spacing.xl)
                 .padding(
                     .bottom,
                     surface == .palette ? metrics.spacing.chatTranscriptBottom : metrics.spacing.xl
                 )
                 .lineSpacing(metrics.spacing.chatLine)
-                // A window can be any width; a line of prose past this stops being readable.
+                // The gutter sits outside the cap, as the composer's does, so both share a column.
                 .frame(maxWidth: surface == .window ? Theme.Size.aiChatReadingWidth : nil)
+                .padding(.horizontal, metrics.spacing.xxl)
                 .frame(maxWidth: .infinity)
             }
             .modifier(TranscriptScrollChrome(surface: surface))
@@ -162,15 +163,17 @@ private struct ResumeFollowingButton: View {
 
     var body: some View {
         Button(action: action) {
-            Label("Jump to Latest", systemImage: "arrow.down")
+            Image(systemName: "arrow.down")
                 .font(metrics.typography.rowTrailing)
                 .foregroundStyle(Theme.Colors.textSecondary)
-                .padding(.horizontal, metrics.spacing.lg)
-                .padding(.vertical, metrics.spacing.sm)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.Colors.border))
+                .frame(width: metrics.size.chatJumpToLatest, height: metrics.size.chatJumpToLatest)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(Theme.Colors.border))
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .help("Jump to Latest")
+        .accessibilityLabel("Jump to Latest")
     }
 }
 
@@ -179,6 +182,7 @@ private struct ChatMessageView: View, @MainActor Equatable {
 
     @Environment(\.metrics) private var metrics
     let message: ChatMessage
+    let surface: ChatSurface
     let status: String?
     let onRegenerate: (() -> Void)?
     let onChoose: ((String) -> Void)?
@@ -197,6 +201,9 @@ private struct ChatMessageView: View, @MainActor Equatable {
         return ChatReferences.extract(from: parts.text)
     }
 
+    /// The palette aligns a reply with its header's chevron; the window, with the composer's edge.
+    private var replyInset: CGFloat { surface == .palette ? metrics.spacing.sm : 0 }
+
     var body: some View {
         HStack {
             if message.role == .user { Spacer(minLength: metrics.spacing.xxl) }
@@ -214,7 +221,7 @@ private struct ChatMessageView: View, @MainActor Equatable {
                     hovered = false
                 }
             }
-            if message.role == .assistant { Spacer(minLength: metrics.spacing.xxl) }
+            if message.role == .assistant { Spacer(minLength: surface == .palette ? metrics.spacing.xxl : 0) }
         }
     }
 
@@ -227,8 +234,8 @@ private struct ChatMessageView: View, @MainActor Equatable {
             if message.role == .assistant { timestamp }
         }
         .opacity(hovered ? 1 : 0)
-        // A reply's footer hugs the same `sm` edge as its text.
-        .padding(.horizontal, message.role == .user ? metrics.spacing.md : metrics.spacing.sm)
+        // A reply's footer hugs the same edge as its text.
+        .padding(.horizontal, message.role == .user ? metrics.spacing.md : replyInset)
     }
 
     private var timestamp: some View {
@@ -251,8 +258,8 @@ private struct ChatMessageView: View, @MainActor Equatable {
                 .font(metrics.typography.rowTitle)
                 .foregroundStyle(.primary)
                 .textSelection(.enabled)
-                // The user bubble is inset because it carries a fill; a reply clears the chevron
-                .padding(.horizontal, message.role == .user ? metrics.spacing.xl : metrics.spacing.sm)
+                // The user bubble is inset because it carries a fill.
+                .padding(.horizontal, message.role == .user ? metrics.spacing.xl : replyInset)
                 .padding(.vertical, metrics.spacing.md)
                 .background(
                     RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
@@ -330,7 +337,7 @@ private struct ChatMessageView: View, @MainActor Equatable {
 
 extension ChatMessageView {
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.message == rhs.message && lhs.status == rhs.status
+        lhs.message == rhs.message && lhs.surface == rhs.surface && lhs.status == rhs.status
             && (lhs.onRegenerate == nil) == (rhs.onRegenerate == nil)
             && (lhs.onChoose == nil) == (rhs.onChoose == nil)
     }
