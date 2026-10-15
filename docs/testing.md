@@ -114,6 +114,7 @@ If a change touches anything in the right column, the harness on the left is man
 | `clipboard-text-test` | Apple Vision/PDF extraction, scheduling, retry backoff and recovery |
 | `paste-sequence-test` | `Clipboard/Model/PasteSequence.swift` — the walk's order, its end, and what starts it over |
 | `clipboard-test` | `Clipboard/Model/ClipboardStore.swift`, `ClipboardFilter.swift`, `ClipboardFileKind.swift`, the colour trio |
+| `clipboard-thumbnail-test` | `Platform/Images/ImageThumbnail.swift` copies against the real store — a remove or clear mid-copy leaves none, same-named JPEG/PNG copies stay apart, a timeout or cancel frees the queue, and a failed or unreadable copy falls back to the original; a stand-in script plays the helper |
 | `pasteboard-test` | `Clipboard/Service/ClipboardManager.swift` capture and `Paster.write` — what a Finder copy reads as, and what a file entry writes back |
 | `emoji-test` | `Emoji/Model/EmojiCatalog.swift`, `EmojiGridGeometry.swift`, the generated data and keyword packs |
 | `emoji-search-test` | `Emoji/Service/EmojiIndex.swift`, `FrequentEmojiStore.swift`, `Scripts/gen-emoji.js`'s keyword format, multilingual search |
@@ -298,6 +299,26 @@ swiftc -O -swift-version 6 Tinycast/Platform/PasteboardFiles.swift \
     Tinycast/Features/Clipboard/Service/ClipboardManager.swift \
     Tests/clipboard-file-performance.swift -o /tmp/clipboard-file-performance
 /tmp/clipboard-file-performance
+```
+
+`Tests/clipboard-thumbnail-performance.swift` draws 10 image rows at once, then 10 previews one by one,
+as Clipboard History does, and prints the times with the footprint and its peak as JSON. `--fixtures`
+writes 10 seeded synthetic Display P3 screenshots up to 3456 × 2234, so no real clipboard is needed.
+`--original` decodes the blobs as before the copies existed; `--copies` makes and reads the
+`ImageDerivative` copies, so its first run measures a first view and later runs every other one. The
+helper must sit at `Contents/Helpers` beside the benchmark:
+
+```sh
+D=/tmp/clipboard-thumbnail-performance; mkdir -p $D/Contents/Helpers
+swiftc -O -swift-version 6 -parse-as-library \
+    Tinycast/Features/Clipboard/Service/{ClipboardTextExtractor,ClipboardTextHelper}.swift \
+    -o $D/Contents/Helpers/ClipboardTextHelper
+swiftc -O -swift-version 6 Tinycast/Platform/ProcessExit.swift \
+    Tinycast/Platform/Images/{ImageThumbnail,ImageDerivative,ThumbnailCache}.swift \
+    Tests/clipboard-thumbnail-performance.swift -o $D/clipboard-thumbnail-performance
+$D/clipboard-thumbnail-performance /tmp/ctp --fixtures
+$D/clipboard-thumbnail-performance /tmp/ctp --original
+$D/clipboard-thumbnail-performance /tmp/ctp --copies
 ```
 
 `Tests/emoji-search-performance.swift` times uncached queries, typing prefixes and memo hits against
