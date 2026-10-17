@@ -176,7 +176,6 @@ private struct FileSearchScopesSection: View {
                     Button("Restore Defaults") {
                         settings.fileSearchScopes = FileSearchScope.defaultScopes
                     }
-                    .help("Index the whole disk.")
                 }
             }
         } header: {
@@ -219,15 +218,12 @@ private struct FileSearchIgnoreSection: View {
 
     private let home = FileManager.default.homeDirectoryForCurrentUser
 
+    private var patterns: [String] { settings.fileSearchEffectiveIgnorePatterns }
+
     var body: some View {
         Section {
-            ForEach(FileSearchIgnoreList.defaults, id: \.self) { pattern in
-                PatternRow(pattern: pattern, onRemove: nil)
-            }
-            ForEach(settings.fileSearchIgnorePatterns, id: \.self) { pattern in
-                PatternRow(pattern: pattern) {
-                    settings.fileSearchIgnorePatterns.removeAll { $0 == pattern }
-                }
+            ForEach(patterns, id: \.self) { pattern in
+                PatternRow(pattern: pattern) { remove(pattern) }
             }
 
             // Titled, a grouped form squeezes the field into a sliver too narrow to click.
@@ -239,6 +235,9 @@ private struct FileSearchIgnoreSection: View {
                     .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
                 Button("Add Folder…", action: addFolders)
                     .help("Skip a folder and everything in it.")
+                if patterns != FileSearchIgnoreList.defaults {
+                    Button("Restore Defaults", action: restoreDefaults)
+                }
             }
         } header: {
             SettingsSectionHeader(.fileSearchIgnorePatterns)
@@ -267,11 +266,25 @@ private struct FileSearchIgnoreSection: View {
     private func add(_ text: String) {
         let pattern = text.trimmingCharacters(in: .whitespaces)
         draft = ""
-        guard !pattern.isEmpty,
-            !FileSearchIgnoreList.defaults.contains(pattern),
-            !settings.fileSearchIgnorePatterns.contains(pattern)
-        else { return }
-        settings.fileSearchIgnorePatterns.append(pattern)
+        guard !pattern.isEmpty, !patterns.contains(pattern) else { return }
+        if FileSearchIgnoreList.defaults.contains(pattern) {
+            settings.fileSearchRemovedDefaultPatterns.removeAll { $0 == pattern }
+        } else {
+            settings.fileSearchIgnorePatterns.append(pattern)
+        }
+    }
+
+    private func remove(_ pattern: String) {
+        if FileSearchIgnoreList.defaults.contains(pattern) {
+            settings.fileSearchRemovedDefaultPatterns.append(pattern)
+        } else {
+            settings.fileSearchIgnorePatterns.removeAll { $0 == pattern }
+        }
+    }
+
+    private func restoreDefaults() {
+        settings.fileSearchIgnorePatterns = []
+        settings.fileSearchRemovedDefaultPatterns = []
     }
 }
 
@@ -291,24 +304,20 @@ private func chooseFolders(message: String) -> [URL]? {
 
 private struct PatternRow: View {
     let pattern: String
-    /// Nil for a built-in rule, which has no remove affordance because it cannot be turned off.
-    let onRemove: (() -> Void)?
+    let onRemove: () -> Void
 
     var body: some View {
         LabeledContent {
-            if let onRemove {
-                Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(pattern)")
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.tertiary)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove \(pattern)")
         } label: {
             Text(pattern)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .foregroundStyle(onRemove == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
         }
     }
 }
