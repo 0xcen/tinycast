@@ -5,6 +5,7 @@ import SwiftUI
 struct PermissionsSettingsView: View {
     @Environment(AppCore.self) private var core
     @State private var accessibilityTrusted = Permissions.isAccessibilityTrusted()
+    @State private var fullDiskAccess = Permissions.hasFullDiskAccess()
     @State private var calendarAccess = Permissions.calendarAccess()
     @State private var microphoneAccess = Permissions.microphoneAccess()
     private let refreshTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -40,6 +41,37 @@ struct PermissionsSettingsView: View {
                 }
             } header: {
                 SettingsSectionHeader(.permissionsAccessibility)
+            }
+
+            Section {
+                LabeledContent {
+                    HStack(spacing: Theme.Spacing.lg) {
+                        HStack(spacing: Theme.Spacing.xs) {
+                            Image(systemName: fullDiskAccessStatus.symbol)
+                                .accessibilityHidden(true)
+                            Text(fullDiskAccessStatus.title)
+                        }
+                        .foregroundStyle(fullDiskAccessStatus.tint)
+                        Button(fullDiskAccess ? "Open…" : "Grant Access…") {
+                            Permissions.openFullDiskAccessSettings()
+                        }
+                        .help("Opens Privacy & Security › Full Disk Access.")
+                    }
+                } label: {
+                    HStack(spacing: Theme.Spacing.lg) {
+                        Image(systemName: "internaldrive.fill")
+                            .font(.system(size: SettingsListMetrics.iconSize - Theme.Spacing.xs))
+                            .frame(width: SettingsListMetrics.iconSize)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                            SettingsRowTitle(.permissionsFullDiskAccess, "Full Disk Access")
+                            Text("For File Search and protected app leftovers.")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                SettingsSectionHeader(.permissionsFullDiskAccess)
             }
 
             Section {
@@ -129,7 +161,15 @@ struct PermissionsSettingsView: View {
     private var calendarNeedsPrompt: Bool { calendarAccess == .notDetermined }
 
     private var accessibilityStatus: (title: String, symbol: String, tint: Color) {
-        accessibilityTrusted
+        grantStatus(accessibilityTrusted)
+    }
+
+    private var fullDiskAccessStatus: (title: String, symbol: String, tint: Color) {
+        grantStatus(fullDiskAccess)
+    }
+
+    private func grantStatus(_ granted: Bool) -> (title: String, symbol: String, tint: Color) {
+        granted
             ? (String(localized: "Granted"), "checkmark.circle.fill", .green)
             : (String(localized: "Not granted"), "exclamationmark.triangle.fill", .orange)
     }
@@ -155,6 +195,11 @@ struct PermissionsSettingsView: View {
     private func refresh() {
         let trusted = Permissions.isAccessibilityTrusted()
         if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
+        let diskAccess = Permissions.hasFullDiskAccess()
+        if diskAccess != fullDiskAccess {
+            fullDiskAccess = diskAccess
+            core.fileIndexer.refreshAccess()
+        }
         let access = Permissions.calendarAccess()
         if access != calendarAccess { calendarAccess = access }
         let microphone = Permissions.microphoneAccess()
