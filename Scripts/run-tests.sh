@@ -136,6 +136,7 @@ run app-installation-test  $L/SearchRelevance.swift $L/ScriptRomanization.swift 
                            Tinycast/Features/Launcher/Service/VisibilityStore.swift \
                            Tinycast/Features/Launcher/Service/BundleNameCache.swift \
                            Tinycast/Platform/AppDisplayName.swift Tinycast/Platform/BundleLocalization.swift \
+                           Tinycast/Platform/SystemLanguages.swift \
                            Tinycast/Platform/Images/FileIconStamp.swift Tinycast/Platform/Memo.swift \
                            Tinycast/Platform/Signposts.swift Tinycast/Platform/NotificationToken.swift
 run launcher-file-test     $L/LauncherFileFormat.swift \
@@ -242,6 +243,8 @@ run appearance-test        Tinycast/Platform/Appearance.swift \
                            Tinycast/DesignSystem/Theme.swift \
                            Tinycast/DesignSystem/InterfaceMetrics.swift \
                            Tinycast/Features/Settings/AppAppearance.swift
+run language-test          Tinycast/Features/Settings/AppLanguage.swift
+run relaunch-test          Tinycast/App/AppDelegate.swift Tinycast/Platform/RelaunchRunner.swift
 run interface-size-test    Tinycast/Platform/Appearance.swift \
                            Tinycast/DesignSystem/Theme.swift \
                            Tinycast/DesignSystem/InterfaceMetrics.swift \
@@ -315,7 +318,7 @@ run fallback-test          Tinycast/Features/Launcher/Model/Fallback.swift \
                            Tinycast/Features/Snippets/Model/Snippet.swift
 run dictionary-test        Tinycast/Features/Dictionary/Model/DictionaryEntry.swift \
                            Tinycast/Features/Dictionary/Model/DictionaryMarkup.swift
-run dictation-test         Tinycast/Features/Dictation/Model/DictationModel.swift Tinycast/Features/Dictation/Model/DictationIdleRelease.swift Tinycast/Features/Dictation/Model/DictationTextFormatter.swift
+run dictation-test         Tinycast/Features/Dictation/Model/DictationModel.swift Tinycast/Features/Dictation/Model/DictationIdleRelease.swift Tinycast/Features/Dictation/Model/DictationLanguage.swift Tinycast/Features/Dictation/Model/DictationTextFormatter.swift
 run dictation-field-test   Tinycast/Features/Dictation/Model/DictationModel.swift \
                            Tinycast/Features/Dictation/Model/DictationAudioChunks.swift \
                            Tinycast/Features/Dictation/Model/DictationMode.swift \
