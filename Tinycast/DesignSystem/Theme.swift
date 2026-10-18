@@ -329,11 +329,6 @@ enum Theme {
         static let glide = Animation.timingCurve(0.2, 0, 0, 1, duration: Theme.Duration.roomGlide)
     }
 
-    enum DialogMotion {
-        static let offset: CGFloat = 3
-        static let initialOpacity: CGFloat = 0.08
-    }
-
     /// Motion owned by Tinycast's menus; extension-provided panels keep their own behavior.
     @MainActor
     enum MenuMotion {

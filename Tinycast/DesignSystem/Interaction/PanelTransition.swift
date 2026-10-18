@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// How every borderless surface arrives and leaves, so a dialog and a HUD read alike.
+// How a borderless surface without native window motion arrives and leaves.
 
 extension NSWindow {
     /// Fades the whole window, shadow included; `order` runs while still invisible.
