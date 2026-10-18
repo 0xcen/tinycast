@@ -256,15 +256,25 @@ final class ClipboardCoordinator {
     }
 
     func editClip(_ item: ClipboardItem) async {
+        guard item.kind == .text else { return }
         guard let text = await core.editClipboardText(item.text ?? ""), !text.isEmpty else { return }
-        guard let edited = clipboardStore.updateText(text, of: item) else {
-            // Deleted while open, so the edit enters history as a new copy rather than being lost.
-            Paster.copyPlainText(text)
-            return
+        do {
+            guard let edited = try clipboardStore.updateText(text, of: item) else {
+                Paster.copyPlainText(text)
+                return
+            }
+            Paster.copy(edited, store: clipboardStore)
+            guard palette.mode == .clipboard else { return }
+            if !palette.clipboardFilter.matches(edited) { palette.clipboardFilter = .all }
+            if clipboardStore.rowIndex(of: edited, in: palette.query, filter: palette.clipboardFilter) == nil {
+                palette.query = ""
+            }
+            selectClip(edited)
+            palette.preserveSelection()
+            palette.followToken = UUID()
+        } catch {
+            core.showMessage(String(localized: "Couldn’t save the clipboard entry"), tone: .danger)
         }
-        Paster.copy(edited, store: clipboardStore)
-        selectClip(edited)
-        palette.followToken = UUID()
     }
 
     /// Pin or unpin an entry; the selection and scroll follow the row as it moves.

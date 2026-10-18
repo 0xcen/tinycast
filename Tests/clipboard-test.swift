@@ -7,12 +7,12 @@ struct ClipboardTests {
     static var failures = 0
     static var passes = 0
 
-    static func main() {
+    static func main() throws {
         pinOrder()
         unpinRejoinsAsNewest()
         pasteLeavesPinsAlone()
-        editRewritesInPlace()
-        editReachesPastTheMemoryWindow()
+        try editRewritesInPlace()
+        try editReachesPastTheMemoryWindow()
         pinsSurvivePruningAndTheWindow()
         pinsLeadFilteredSearches()
         pinnedSlotResolutionUsesVisiblePins()
@@ -108,15 +108,15 @@ struct ClipboardTests {
     }
 
     /// An edit keeps the entry's id, pin and place; search and the database see only the new text.
-    static func editRewritesInPlace() {
-        withStore { store, dir in
+    static func editRewritesInPlace() throws {
+        try withStore { store, dir in
             store.addText("first draft", sourceBundleID: nil)
             store.addText("pinned draft", sourceBundleID: nil)
             store.addText("newest", sourceBundleID: nil)
             store.togglePinned(item(store, "pinned draft"))
             let original = item(store, "first draft")
 
-            let edited = store.updateText("final copy", of: original)
+            let edited = try store.updateText("final copy", of: original)
             expect(edited?.id == original.id, "an edit keeps the entry's id")
             expect(
                 texts(store) == ["pinned draft", "newest", "final copy"],
@@ -128,7 +128,7 @@ struct ClipboardTests {
                 store.search("final", filter: .all).map(\.id) == [original.id],
                 "the new text is found")
 
-            _ = store.updateText("pinned final", of: item(store, "pinned draft"))
+            _ = try store.updateText("pinned final", of: item(store, "pinned draft"))
             expect(item(store, "pinned final").isPinned, "an edit keeps the pin")
 
             let reopened = ClipboardStore(directory: dir)
@@ -139,17 +139,17 @@ struct ClipboardTests {
 
             let deleted = item(store, "newest")
             store.remove(deleted)
-            expect(store.updateText("ghost", of: deleted) == nil, "a deleted entry cannot be edited")
+            expect(try store.updateText("ghost", of: deleted) == nil, "a deleted entry cannot be edited")
             expect(!texts(store).contains("ghost"), "and does not come back")
 
             let image = ClipboardItem(imagePath: "/tmp/shot.png", sourceBundleID: nil)
-            expect(store.updateText("caption", of: image) == nil, "only a text entry is editable")
+            expect(try store.updateText("caption", of: image) == nil, "only a text entry is editable")
         }
     }
 
     /// A row found past the resident window has nowhere in memory to change, so the memo must.
-    static func editReachesPastTheMemoryWindow() {
-        withStore { store, _ in
+    static func editReachesPastTheMemoryWindow() throws {
+        try withStore { store, _ in
             let total = 1_200
             store.importEntries(
                 (0..<total).map {
@@ -163,7 +163,7 @@ struct ClipboardTests {
             }
             expect(!store.items.contains { $0.id == oldest.id }, "the oldest entry is not resident")
 
-            _ = store.updateText("renamed oldest", of: oldest)
+            _ = try store.updateText("renamed oldest", of: oldest)
             expect(store.search("entry 0", filter: .all).isEmpty, "the memo drops the old text")
             expect(
                 store.search("renamed", filter: .all).map(\.id) == [oldest.id],
@@ -869,10 +869,10 @@ struct ClipboardTests {
     // MARK: - Harness
 
     /// Runs `body` against a store rooted in a fresh temp directory, torn down afterwards.
-    static func withStore(_ body: (ClipboardStore, URL) -> Void) {
+    static func withStore(_ body: (ClipboardStore, URL) throws -> Void) rethrows {
         let dir = scratchDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
-        body(ClipboardStore(directory: dir), dir)
+        try body(ClipboardStore(directory: dir), dir)
     }
 
     static func scratchDirectory() -> URL {

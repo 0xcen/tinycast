@@ -264,10 +264,14 @@ its marked text, in every dialog.
 `ClipboardStore.updateText(_:of:)` rewrites the row's `text` under the same id, so the `items_au`
 trigger reindexes FTS and nothing else changes. `Paster.copy` then writes it marked and promotes it
 unless pinned, and the palette stays up with the row selected and scrolled into view, so ⌘V pastes
-the edit and so does ↵ on the row. An empty edit changes nothing. An entry deleted while open — by
+the edit and so does ↵ on the row. A query or type filter that hides the edit is cleared; matching
+ones stay. The palette preserves the row through its query and filter observers, including a pin
+past the first row. An empty edit changes nothing. An entry deleted while open — by
 retention, say — is not brought back: `updateText` answers nil and the text goes on the pasteboard
 **unmarked**, entering history as a new copy rather than being lost. A row found by FTS past the
 resident window has no in-memory copy to replace, so the store drops its search memo instead.
+Database write failures throw instead of taking the deleted-entry path: the HUD reports the failure,
+and neither the clipboard nor the selection changes.
 
 ## Type filter
 

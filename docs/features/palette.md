@@ -138,8 +138,9 @@ that returning looks like never having left — and offers four motions over it:
 `pop()` bumps `followToken` rather than `resetToken`: the reset token exists to land a list afresh,
 which would throw away the very selection being restored. The native editors opt into
 `pop(preservingSelection: true)` so `restoredSelection` also carries that row through the mode and query
-observers. Typing a new query or opening a fresh screen clears it; filter resets still use the screen's
-own landing row. Other screens keep their existing navigation behaviour.
+observers. Clipboard edits call `preserveSelection()` after clearing a query or type filter that hides
+the edited row, so both observers keep that row selected. Typing a new query, changing the clipboard
+filter or opening a fresh screen clears it. Other filters keep their screen's own landing row.
 
 Native editor drafts live only while their form is mounted. Switching features replaces that form,
 keeping its previous browser or search underneath; Back never restores a discarded draft's mode.
