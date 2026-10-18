@@ -152,7 +152,7 @@ pushed screen pops, and a root hides the palette. A focused inline argument fiel
 query, so Escape hands focus back to the search field first — the query that found the command is
 still there to be cleared by the next press. A bare backspace in an empty field takes the same step
 **but never closes**: on a root screen summoned by its own hotkey it falls to the root search, which
-is the step Escape would have taken had that screen been reached by typing its name. ⌘⎋ skips the
+is the step Escape would have taken had that screen been reached by typing its name. ⌘esc skips the
 whole stack for that same root search from any depth.
 
 `EscapeKeyBehavior` (General settings) can trade the walk back for the old behavior: under
@@ -166,7 +166,7 @@ pops, a root one closes — so `backHelp` says which, rather than promising a st
 a close. It lights to `textPrimary` under the pointer over `Theme.Duration.hover`, and
 `HeaderBackButton` keeps that hover state to itself so the header around it never re-renders.
 
-The launcher advertises the first hop in the header — `Quick AI` beside its sparkles icon.
+The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap.
 It is drawn only when Tab really would open Quick AI, a condition read
 back out of `PaletteTabAction` rather than restated, so a hint can never promise a destination the
 key does not go to: an argument field to walk takes Tab first, and the hint steps aside for it.
@@ -559,15 +559,15 @@ handled in `PalettePanel.sendEvent` before `super` hands the event to the respon
 - **Emoji zoom chords.** `⌘0`, `⌘+` and `⌘-` take the same `onCommandShortcut` path on the emoji
   screen, Shift allowed since `+` is a shifted `=`. They bump `PaletteState.emojiGridZoomToken`, and
   `EmojiScreen.zoom` applies the same bounded change as its Actions rows.
-- **Chords the window server keeps for itself.** ⌘⎋ is the one that bites: macOS binds it before any
-  app sees it, so unlike ⌘. there is no keystroke left for `sendEvent` to intercept — a handler in
-  the responder chain compiles, runs never, and looks like a palette bug. `CommandEscapeTap` takes it
-  at the head of the HID stream instead, the one place earlier than the system's own binding, and
-  `prepare(mode: .launcher)`s: one chord back to the root search from any depth, window still open.
-  The tap is enabled only while the palette is on screen, watches `keyDown` alone, and declines the
-  chord whenever the panel is not key, so nothing else on the system loses ⌘⎋ to it. It is a
-  modifying tap, so it needs Accessibility — without that grant the chord is simply unavailable,
-  which is the only path this codebase has to it.
+- **Chords the window server keeps for itself.** ⌘esc is the one that bites: macOS binds it before
+  any app sees it, so unlike ⌘. there is no keystroke left for `sendEvent` to intercept — a handler
+  in the responder chain compiles, runs never, and looks like a palette bug. `CommandEscapeTap`
+  takes it at the head of the HID stream instead, the one place earlier than the system's own
+  binding, and `prepare(mode: .launcher)`s: one chord back to the root search from any depth, window
+  still open. The tap is enabled only while the palette is on screen, watches `keyDown` alone, and
+  declines the chord whenever the panel is not key, so nothing else on the system loses ⌘esc to it.
+  It is a modifying tap, so it needs Accessibility — without that grant the chord is simply
+  unavailable, which is the only path this codebase has to it.
 
 Adding a chord that "does nothing" is almost always one of these — check `sendEvent`, and then
 whether macOS has claimed the chord, before assuming the handler is wrong.

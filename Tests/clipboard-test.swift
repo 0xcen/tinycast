@@ -11,6 +11,8 @@ struct ClipboardTests {
         pinOrder()
         unpinRejoinsAsNewest()
         pasteLeavesPinsAlone()
+        editRewritesInPlace()
+        editReachesPastTheMemoryWindow()
         pinsSurvivePruningAndTheWindow()
         pinsLeadFilteredSearches()
         pinnedSlotResolutionUsesVisiblePins()
@@ -102,6 +104,70 @@ struct ClipboardTests {
             expect(
                 texts(store) == ["one", "two", "three", "four"],
                 "an unpinned row still promotes to the head of the history")
+        }
+    }
+
+    /// An edit keeps the entry's id, pin and place; search and the database see only the new text.
+    static func editRewritesInPlace() {
+        withStore { store, dir in
+            store.addText("first draft", sourceBundleID: nil)
+            store.addText("pinned draft", sourceBundleID: nil)
+            store.addText("newest", sourceBundleID: nil)
+            store.togglePinned(item(store, "pinned draft"))
+            let original = item(store, "first draft")
+
+            let edited = store.updateText("final copy", of: original)
+            expect(edited?.id == original.id, "an edit keeps the entry's id")
+            expect(
+                texts(store) == ["pinned draft", "newest", "final copy"],
+                "an edit leaves the entry where it was")
+            expect(
+                store.search("draft", filter: .all).compactMap(\.text) == ["pinned draft"],
+                "the old text is no longer found")
+            expect(
+                store.search("final", filter: .all).map(\.id) == [original.id],
+                "the new text is found")
+
+            _ = store.updateText("pinned final", of: item(store, "pinned draft"))
+            expect(item(store, "pinned final").isPinned, "an edit keeps the pin")
+
+            let reopened = ClipboardStore(directory: dir)
+            reopened.load()
+            expect(
+                texts(reopened) == ["pinned final", "newest", "final copy"],
+                "the edit is what reaches disk")
+
+            let deleted = item(store, "newest")
+            store.remove(deleted)
+            expect(store.updateText("ghost", of: deleted) == nil, "a deleted entry cannot be edited")
+            expect(!texts(store).contains("ghost"), "and does not come back")
+
+            let image = ClipboardItem(imagePath: "/tmp/shot.png", sourceBundleID: nil)
+            expect(store.updateText("caption", of: image) == nil, "only a text entry is editable")
+        }
+    }
+
+    /// A row found past the resident window has nowhere in memory to change, so the memo must.
+    static func editReachesPastTheMemoryWindow() {
+        withStore { store, _ in
+            let total = 1_200
+            store.importEntries(
+                (0..<total).map {
+                    ClipboardItem(
+                        id: UUID(), kind: .text, text: "entry \($0)", imagePath: nil,
+                        createdAt: Date().addingTimeInterval(TimeInterval($0 - total)),
+                        sourceBundleID: nil)
+                })
+            guard let oldest = store.search("entry 0", filter: .all).first else {
+                return fail("the oldest entry is found past the window")
+            }
+            expect(!store.items.contains { $0.id == oldest.id }, "the oldest entry is not resident")
+
+            _ = store.updateText("renamed oldest", of: oldest)
+            expect(store.search("entry 0", filter: .all).isEmpty, "the memo drops the old text")
+            expect(
+                store.search("renamed", filter: .all).map(\.id) == [oldest.id],
+                "and search answers with the edit")
         }
     }
 

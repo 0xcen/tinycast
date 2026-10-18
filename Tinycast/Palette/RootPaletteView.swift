@@ -789,15 +789,11 @@ struct RootPaletteView: View {
                 Text("Quick AI")
                     .font(metrics.typography.bar)
                     .foregroundStyle(Theme.Colors.textSecondary)
-                SymbolImage(
-                    name: CommandID.quickAI.sfSymbol,
-                    size: metrics.scaled(Theme.Typography.menuSymbolSize), monochrome: true
-                )
-                .foregroundStyle(Theme.Colors.textSecondary)
-                .accessibilityHidden(true)
+                KeyCapChip(text: "⇥", style: .outline)
+                    .accessibilityHidden(true)
             }
         }
-        .help("Ask Quick AI")
+        .help("Press Tab to ask Quick AI")
     }
 
     /// Resolved through `PaletteTabAction`, so the hint cannot promise the wrong destination.

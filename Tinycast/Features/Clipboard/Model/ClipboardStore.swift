@@ -403,6 +403,29 @@ final class ClipboardStore {
         if item.isPinned { unpin(item) } else { pin(item) }
     }
 
+    func updateText(_ text: String, of item: ClipboardItem) -> ClipboardItem? {
+        guard item.kind == .text, let stmt = prepare("UPDATE items SET text = ?1 WHERE id = ?2")
+        else { return nil }
+        sqlite3_bind_text(stmt, 1, text, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 2, item.id.uuidString, -1, SQLITE_TRANSIENT)
+        let updated = sqlite3_step(stmt) == SQLITE_DONE && sqlite3_changes(db) > 0
+        sqlite3_finalize(stmt)
+        guard updated else { return nil }
+        let index = items.firstIndex { $0.id == item.id }
+        let current = index.map { items[$0] } ?? item
+        let edited = ClipboardItem(
+            id: current.id, kind: .text, text: text, imagePath: nil, createdAt: current.createdAt,
+            sourceBundleID: current.sourceBundleID, pinnedAt: current.pinnedAt)
+        if let index {
+            items[index] = edited
+        } else {
+            // An FTS hit past the memory window: only the memo still holds the old text.
+            invalidateSearch()
+            searchRevision += 1
+        }
+        return edited
+    }
+
     func remove(_ item: ClipboardItem) {
         textSearchMatches.removeAll { $0.id == item.id }
         if let stmt = deleteByIDStmt {
