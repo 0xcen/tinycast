@@ -182,6 +182,8 @@ final class NotesWindowController: NSObject, NSWindowDelegate {
         panel.titlebarAppearsTransparent = true
         // `.automatic` draws a hairline the moment the editor scrolls under the bar.
         panel.titlebarSeparatorStyle = .none
+        // Only the editor bounces; `NotesPanel`'s popups stay instant.
+        panel.animationBehavior = .documentWindow
         panel.contentMinSize = Theme.Size.noteWindow
         panel.delegate = self
         panel.onEscape = { [weak self, weak coordinator] in
