@@ -494,13 +494,13 @@ The panel is a second SwiftUI hierarchy, so it observes nothing of `RootPaletteV
 `paletteEnvironment` injects the same stores into both hierarchies so they cannot drift.
 `WindowReader` reports the palette's `NSWindow`, which the menu's frame is placed against.
 
-`PaletteMenuContent` may supply its own host-layer clip path and motion.
-The hosting layer scales inside a canvas sized for the largest frame, anchored to the button or
-header control that opened it, so neither the surface nor its shadow is cropped. AppKit refreshes
-the shadow after layout and display. Native `PopoverMenu` content reads its motion from
-`Theme.MenuMotion`; extension menus supply values owned by `Features/Extensions`, so launcher
-changes cannot silently alter an extension surface. Each extension menu also supplies its own clip
-path; the controller applies it as an opaque value and never reconstructs extension geometry.
+`PaletteMenuContent` may supply its own host-layer clip path. `MenuPanel` uses
+`animationBehavior = .documentWindow`, so every menu opens and closes with AppKit's native window
+animation and has no motion of its own. The close animation keeps drawing the panel after
+`orderOut`, so the controller releases the hosted tree only when the panel's occlusion state reports
+it off screen. AppKit refreshes the shadow after layout and display. Each extension menu supplies its
+own clip path; the controller applies it as an opaque value and never reconstructs extension
+geometry.
 
 ## Menu-open input freeze
 
