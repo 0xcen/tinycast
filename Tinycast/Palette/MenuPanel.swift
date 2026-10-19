@@ -69,7 +69,6 @@ final class MenuPanelController {
     private weak var parent: NSWindow?
     private var clipPath: MenuPanelClipPath?
     private var placement: Placement?
-    private var occlusionObserver: NotificationToken?
 
     var isOpen: Bool { panel?.isVisible ?? false }
 
@@ -157,7 +156,7 @@ final class MenuPanelController {
         if panel.isKeyWindow { parent?.makeKey() }
         // A hidden child must detach or AppKit restores it with its parent on the next summon.
         panel.parent?.removeChildWindow(panel)
-        panel.orderOut(nil)
+        panel.orderOutAnimated { [weak self] in self?.releaseHiddenContent() }
     }
 
     private func ensurePanel(state: PaletteState) -> MenuPanel {
@@ -167,19 +166,13 @@ final class MenuPanelController {
         }
         let panel = MenuPanel()
         panel.paletteState = state
-        let observer = NotificationCenter.default.addObserver(
-            forName: NSWindow.didChangeOcclusionStateNotification, object: panel, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.releaseHiddenContent() }
-        }
-        occlusionObserver = NotificationToken(observer, center: .default)
         self.panel = panel
         return panel
     }
 
-    /// The close animation keeps drawing the panel after `orderOut`, so wait until it is gone.
+    /// A menu reopened during the close animation keeps the tree it was given.
     private func releaseHiddenContent() {
-        guard let panel, !panel.isVisible, !panel.occlusionState.contains(.visible) else { return }
+        guard panel?.isVisible == false else { return }
         hosting?.rootView = AnyView(EmptyView())
     }
 

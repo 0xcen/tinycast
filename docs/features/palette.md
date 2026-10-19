@@ -497,8 +497,7 @@ The panel is a second SwiftUI hierarchy, so it observes nothing of `RootPaletteV
 `PaletteMenuContent` may supply its own host-layer clip path. `MenuPanel` uses
 `animationBehavior = .documentWindow`, so every menu opens and closes with AppKit's native window
 animation and has no motion of its own. The close animation keeps drawing the panel after
-`orderOut`, so the controller releases the hosted tree only when the panel's occlusion state reports
-it off screen. AppKit refreshes the shadow after layout and display. Each extension menu supplies its
+`orderOut`, so the controller releases the hosted tree from `orderOutAnimated`, once it is off screen. AppKit refreshes the shadow after layout and display. Each extension menu supplies its
 own clip path; the controller applies it as an opaque value and never reconstructs extension
 geometry.
 
@@ -514,7 +513,7 @@ caret, mouse selection and standard editing commands.
   keeps ↑/↓, ↵, Tab and action chords on the menu while leaving text editing, selection and
   clipboard commands to AppKit.
 - The palette window delegate ignores this intentional key transfer. Losing key status to anything
-  else still dismisses the palette, and closing the child restores key status before it fades out.
+  else still dismisses the palette, and closing the child restores key status before it orders out.
 - The caret is hidden by clearing SwiftUI's **own** live field editor's `insertionPointColor`. SwiftUI
   force-casts its field editor to a private subclass, so vending a custom one crashes. The searchable
   menu draws no caret of its own; AppKit draws the caret in its field editor.
