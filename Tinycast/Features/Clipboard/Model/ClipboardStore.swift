@@ -170,7 +170,7 @@ enum ClipboardChord: CaseIterable, Sendable {
 @MainActor
 @Observable
 final class ClipboardStore {
-    enum UpdateError: Error { case writeFailed }
+    enum UpdateError: Error { case tooLong, writeFailed }
 
     /// Newest-first with pins in place, every pin resident. docs/features/clipboard.md
     private(set) var items: [ClipboardItem] = [] {
@@ -206,6 +206,8 @@ final class ClipboardStore {
     /// Same memo for the empty query, so the pinned split runs once per mutation.
     @ObservationIgnored private var orderedCache: [ClipboardItem]?
 
+    /// Longest text history holds; a longer copy is skipped, since truncation would lose the tail.
+    nonisolated static let maxTextLength = 32_000
     nonisolated private static let memoryWindow = 1000
     /// The most unpinned rows any one query answers with, ordinary and OCR-only alike.
     nonisolated private static let searchLimit = 200
@@ -407,6 +409,7 @@ final class ClipboardStore {
 
     func updateText(_ text: String, of item: ClipboardItem) throws(UpdateError) -> ClipboardItem? {
         guard item.kind == .text else { return nil }
+        guard text.count <= Self.maxTextLength else { throw .tooLong }
         guard let stmt = prepare("UPDATE items SET text = ?1 WHERE id = ?2") else {
             throw .writeFailed
         }

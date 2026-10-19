@@ -266,12 +266,17 @@ final class ClipboardCoordinator {
             Paster.copy(edited, store: clipboardStore)
             guard palette.mode == .clipboard else { return }
             if !palette.clipboardFilter.matches(edited) { palette.clipboardFilter = .all }
-            if clipboardStore.rowIndex(of: edited, in: palette.query, filter: palette.clipboardFilter) == nil {
+            if clipboardStore.rowIndex(of: edited, in: palette.query, filter: palette.clipboardFilter) == nil
+            {
                 palette.query = ""
             }
             selectClip(edited)
             palette.preserveSelection()
             palette.followToken = UUID()
+        } catch .tooLong {
+            let limit = ClipboardStore.maxTextLength.formatted()
+            core.showMessage(
+                String(localized: "Too long to save. Keep it under \(limit) characters."), tone: .danger)
         } catch {
             core.showMessage(String(localized: "Couldn’t save the clipboard entry"), tone: .danger)
         }

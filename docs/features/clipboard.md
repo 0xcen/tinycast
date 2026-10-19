@@ -272,6 +272,9 @@ retention, say — is not brought back: `updateText` answers nil and the text go
 resident window has no in-memory copy to replace, so the store drops its search memo instead.
 Database write failures throw instead of taking the deleted-entry path: the HUD reports the failure,
 and neither the clipboard nor the selection changes.
+An edit is held to `ClipboardStore.maxTextLength`, the same 32,000 characters capture records, so a
+longer one is refused with a HUD and nothing changes; past that, every later paste of the entry
+would reindex it on the main actor.
 
 ## Type filter
 

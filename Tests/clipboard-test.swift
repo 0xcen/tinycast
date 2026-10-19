@@ -13,6 +13,7 @@ struct ClipboardTests {
         pasteLeavesPinsAlone()
         try editRewritesInPlace()
         try editReachesPastTheMemoryWindow()
+        editHonoursTheCaptureLimit()
         pinsSurvivePruningAndTheWindow()
         pinsLeadFilteredSearches()
         pinnedSlotResolutionUsesVisiblePins()
@@ -144,6 +145,24 @@ struct ClipboardTests {
 
             let image = ClipboardItem(imagePath: "/tmp/shot.png", sourceBundleID: nil)
             expect(try store.updateText("caption", of: image) == nil, "only a text entry is editable")
+        }
+    }
+
+    /// An edit may hold no more text than capture would have recorded.
+    static func editHonoursTheCaptureLimit() {
+        withStore { store, _ in
+            store.addText("short", sourceBundleID: nil)
+            let longest = String(repeating: "a", count: ClipboardStore.maxTextLength)
+            expect(
+                (try? store.updateText(longest, of: item(store, "short"))) != nil,
+                "an edit at the limit saves")
+            do throws(ClipboardStore.UpdateError) {
+                _ = try store.updateText(longest + "a", of: item(store, longest))
+                fail("an edit past the limit is refused")
+            } catch {
+                expect(error == .tooLong, "an edit past the limit reports its length")
+            }
+            expect(texts(store) == [longest], "a refused edit leaves the entry as it was")
         }
     }
 

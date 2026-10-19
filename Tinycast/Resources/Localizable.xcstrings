@@ -124448,6 +124448,58 @@
         }
       }
     },
+    "Too long to save. Keep it under %@ characters." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zu lang zum Sichern. Bleib unter %@ Zeichen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demasiado largo para guardar. Mantenlo por debajo de %@ caracteres."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop long pour être enregistré. Restez sous les %@ caractères."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長すぎるため保存できません。%@文字未満にしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "너무 길어서 저장할 수 없습니다. %@자 미만으로 줄이십시오."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Longo demais para salvar. Mantenha abaixo de %@ caracteres."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Слишком длинно для сохранения. Не больше %@ символов."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太长，无法存储。请保持在 %@ 个字符以内。"
+          }
+        }
+      }
+    },
     "Tool call rounds" : {
       "localizations" : {
         "de" : {

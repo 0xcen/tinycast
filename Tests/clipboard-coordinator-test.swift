@@ -12,6 +12,7 @@ struct ClipboardCoordinatorTests {
         try await writeFailureKeepsHistoryAndClipboard()
         await closedStoreIsNotDeletion()
         await deletedEntryBecomesANewCopy()
+        await tooLongEditIsRefused()
         await changedScreenKeepsItsSelection()
         await cancelledAndEmptyEditsChangeNothing()
         print("\(passes) passed, \(failures) failed")
@@ -38,13 +39,15 @@ struct ClipboardCoordinatorTests {
 
                 await fixture.coordinator.editClip(fixture.item)
 
-                let rows = fixture.store.search(fixture.palette.query, filter: fixture.palette.clipboardFilter)
+                let rows = fixture.store.search(
+                    fixture.palette.query, filter: fixture.palette.clipboardFilter)
                 expect(
                     rows.indices.contains(fixture.palette.selection)
                         && rows[fixture.palette.selection].id == fixture.item.id,
                     "the edited entry stays selected, pinned=\(pinned), query=\(query), filter=\(filter)")
                 expect(fixture.palette.query == expectedQuery, "only a hiding query is cleared")
-                expect(fixture.palette.clipboardFilter == expectedFilter, "only a hiding type filter is cleared")
+                expect(
+                    fixture.palette.clipboardFilter == expectedFilter, "only a hiding type filter is cleared")
                 expect(
                     fixture.palette.restoredSelection == fixture.palette.selection,
                     "query and filter observers restore the edited row instead of landing on another")
@@ -74,12 +77,14 @@ struct ClipboardCoordinatorTests {
             throw CocoaError(.fileReadUnknown)
         }
         defer { sqlite3_close(writer) }
-        expect(sqlite3_exec(writer, "BEGIN IMMEDIATE", nil, nil, nil) == SQLITE_OK, "the fixture locks writes")
+        expect(
+            sqlite3_exec(writer, "BEGIN IMMEDIATE", nil, nil, nil) == SQLITE_OK, "the fixture locks writes")
 
         await fixture.coordinator.editClip(fixture.item)
 
         expect(fixture.store.items == before, "a locked database leaves history unchanged")
-        expect(Paster.copies.isEmpty && Paster.plainCopies.isEmpty, "a write failure leaves the clipboard alone")
+        expect(
+            Paster.copies.isEmpty && Paster.plainCopies.isEmpty, "a write failure leaves the clipboard alone")
         expect(
             fixture.core.messages == ["Couldn’t save the clipboard entry"],
             "a failed save is reported instead of being treated as deletion")
@@ -103,7 +108,9 @@ struct ClipboardCoordinatorTests {
         defer { fixture.cleanUp() }
         fixture.core.onEdit = { fixture.store.close() }
         await fixture.coordinator.editClip(fixture.item)
-        expect(Paster.plainCopies.isEmpty && Paster.copies.isEmpty, "a closed store never copies a supposed deletion")
+        expect(
+            Paster.plainCopies.isEmpty && Paster.copies.isEmpty,
+            "a closed store never copies a supposed deletion")
         expect(fixture.core.messages.count == 1, "an unavailable database reports the save failure")
         fixture.store.open()
         fixture.store.load()
@@ -118,8 +125,21 @@ struct ClipboardCoordinatorTests {
         fixture.core.onEdit = { fixture.store.remove(fixture.item) }
         await fixture.coordinator.editClip(fixture.item)
         expect(Paster.plainCopies == ["final selected"], "only a confirmed deletion takes the new-copy path")
-        expect(Paster.copies.isEmpty && fixture.core.messages.isEmpty, "a deleted row is not saved or reported as failure")
+        expect(
+            Paster.copies.isEmpty && fixture.core.messages.isEmpty,
+            "a deleted row is not saved or reported as failure")
         expect(!fixture.store.items.contains { $0.id == fixture.item.id }, "the deleted entry stays deleted")
+    }
+
+    static func tooLongEditIsRefused() async {
+        let fixture = Fixture()
+        defer { fixture.cleanUp() }
+        let before = fixture.store.items
+        fixture.core.editedText = String(repeating: "a", count: ClipboardStore.maxTextLength + 1)
+        await fixture.coordinator.editClip(fixture.item)
+        expect(fixture.store.items == before, "an edit past the limit leaves history unchanged")
+        expect(Paster.copies.isEmpty && Paster.plainCopies.isEmpty, "an edit past the limit never copies")
+        expect(fixture.core.messages.count == 1, "an edit past the limit is reported")
     }
 
     static func cancelledAndEmptyEditsChangeNothing() async {
@@ -151,7 +171,9 @@ struct ClipboardCoordinatorTests {
     }
 
     static func expect(_ condition: Bool, _ message: String) {
-        if condition { passes += 1 } else {
+        if condition {
+            passes += 1
+        } else {
             failures += 1
             print("FAIL: \(message)")
         }
@@ -261,9 +283,13 @@ enum Paster {
     }
     @discardableResult
     static func copyPlainText(_ text: String) -> Bool { plainCopies.append(text); return true }
-    static func paste(_ item: ClipboardItem, store: ClipboardStore, previousApp: NSRunningApplication?) -> Bool { true }
+    static func paste(
+        _ item: ClipboardItem, store: ClipboardStore, previousApp: NSRunningApplication?
+    ) -> Bool { true }
     static func pastePlainText(
         _ item: ClipboardItem, store: ClipboardStore, previousApp: NSRunningApplication?
     ) -> Bool { true }
-    static func pasteInPlace(_ item: ClipboardItem, store: ClipboardStore, into app: NSRunningApplication?) -> Bool { true }
+    static func pasteInPlace(
+        _ item: ClipboardItem, store: ClipboardStore, into app: NSRunningApplication?
+    ) -> Bool { true }
 }
