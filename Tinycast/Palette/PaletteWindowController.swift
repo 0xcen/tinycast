@@ -21,7 +21,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     private let dropGuides = PaletteDropGuideController()
     /// ⌘V: `Edit ▸ Paste` claims it before `sendEvent` whenever the board also carries text.
     private var pasteMonitor: Any?
-    /// ⌘⎋: the window server claims it, so no keystroke is left for the responder chain to see.
+    /// ⌘esc: the window server claims it, so no keystroke is left for the responder chain to see.
     private lazy var commandEscapeTap = CommandEscapeTap { [weak self] in
         guard let self, self.panel?.isKeyWindow == true else { return false }
         self.core.palette.prepare(mode: .launcher)

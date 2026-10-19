@@ -256,6 +256,7 @@ enum Theme {
         static let dialogCompactWidth: CGFloat = 290
         /// Tinycast's own control dialog: fixed width, height measured from its SwiftUI content.
         static let dialogWidth: CGFloat = 420
+        static let dialogTextHeight: CGFloat = 180
         static let dialogButtonHeight: CGFloat = menuButton - 2
         static let dialogSymbol: CGFloat = 28
         static let dialogSymbolContainer: CGFloat = 52

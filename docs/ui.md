@@ -522,14 +522,16 @@ sole owner rule) and is the only presenter, so every confirmation in the app loo
   callout face; semantic roles change colour, never weight. `dialogButtonHeight 34` is shared by the
   actions and dialog text fields. The fields use the non-pill `row 10` radius.
 - **Keys.** `DialogPanel.sendEvent` intercepts Esc and ↵ directly instead of relying on SwiftUI
-  `onKeyPress`, so the keys work without anything inside the dialog holding focus. Buttons don't print
-  a key cap; after `tooltipDelay` of deliberate hover, `.tooltip(keyCap:)` fades in the shared
-  `Tooltip` tile holding an outlined `KeyCapChip` for the key the panel actually handles (`↵`, `⎋`).
-  Only those two keys are ever advertised, so a shown cap cannot drift from dialog behavior.
+  `onKeyPress`, so the keys work without anything inside the dialog holding focus. Buttons don't
+  print a key cap; after `tooltipDelay` of deliberate hover, `.tooltip(keyCaps:)` fades in the shared
+  `Tooltip` tile holding one outlined `KeyCapChip` per key the panel actually handles (`↵`, `esc`,
+  or `⌘` `↵`). Only those keys are ever advertised, so a shown cap cannot drift from dialog behavior.
   **↵ runs the dialog's primary action; Escape cancels**, on every dialog including destructive ones.
   Arrow keys walk the volume slider along the same 5% grid the volume commands use (`DialogPanel`
   reports `.increment` / `.decrement` and `DialogController` applies `VolumeLevel.stepped`, so the
-  panel never learns what a volume step is); click-away resolves as a dismissal.
+  panel never learns what a volume step is); click-away resolves as a dismissal. ↵ that commits an
+  input method's marked text never confirms, and a multi-line accessory takes ↵ as a line break, so
+  its dialog confirms on ⌘↵ and its default button advertises that instead.
 - **Async, not modal.** Presentation is `async` (`withCheckedContinuation`), so there is no nested run
   loop. A held hotkey can't stack dialogs: while one is up, a second request resolves immediately as a
   dismissal — which is why the old `isConfirmingCommand` re-entrancy flag is gone.
@@ -652,16 +654,18 @@ it would couple two unrelated surfaces.
 ## Dialog accessories
 
 A dialog carries at most one control beyond its buttons, and `DialogAccessory` makes that structural
-rather than a convention — `.volume` for the Set Volume prompt and `.snippetArguments` for a snippet's
-`{argument}` values. Text fields take `dialogTextField()`; inline enumerated arguments are `DialogChip`s.
-`DialogPanel.handlesArrowKeys` is set from `DialogAccessory.claimsArrowKeys`, so the slider steps on
-←/→ while snippet argument text fields keep their caret. Create Event uses the launcher form instead.
+rather than a convention — `.volume` for the Set Volume prompt, `.snippetArguments` for a snippet's
+`{argument}` values and `.clipboardText` for Edit Entry. Text fields take `dialogTextField()`;
+inline enumerated arguments are `DialogChip`s. `DialogPanel.handlesArrowKeys` is set from
+`DialogAccessory.claimsArrowKeys`, so the slider steps on ←/→ while snippet argument text fields
+keep their caret, and `acceptsLineBreaks` from the accessory of the same name, so only Edit Entry's
+`dialogTextHeight` text area takes ↵. Create Event uses the launcher form instead.
 
-The first text field takes focus from `DialogController.windowDidBecomeKey`, never from the view.
-When the panel turns key AppKit picks its own first responder — the Cancel button with Keyboard
-navigation on — and over another app that happens only after `show` returns, so focus a SwiftUI view
-asks for loses to it. The panel can also turn key inside `makeKeyAndOrderFront`, before SwiftUI has
-built the field, so `DialogPanel.focusFirstTextField` lays the content out first.
+The first text field or text view takes focus from `DialogController.windowDidBecomeKey`, never from
+the view. When the panel turns key AppKit picks its own first responder — the Cancel button with
+Keyboard navigation on — and over another app that happens only after `show` returns, so focus a
+SwiftUI view asks for loses to it. The panel can also turn key inside `makeKeyAndOrderFront`, before
+SwiftUI has built the field, so `DialogPanel.focusFirstTextField` lays the content out first.
 
 ## Settings
 

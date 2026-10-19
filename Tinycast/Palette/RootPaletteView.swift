@@ -394,7 +394,7 @@ struct RootPaletteView: View {
             .modifier(PaletteHideObserver { if menuOpen { closeMenus() } })
             .onChange(of: vm.query) {
                 if vm.collapseQueryLineBreaks() { return }
-                land(restoringNavigation: true)
+                land(restoringSelection: true)
                 if vm.mode == .fileSearch { fileSearch.search(vm.query, filter: vm.fileSearchFilter) }
                 if vm.mode == .launcher { core.fileSearchCoordinator.searchFromLauncher(vm.query) }
                 if vm.mode == .dictionary { dictionary.lookUp(vm.query) }
@@ -412,7 +412,7 @@ struct RootPaletteView: View {
             }
             .modifier(ExtensionSelectionForwarder(screen: extensionScreen, selection: vm.selection))
             // A narrower list means the old index points at a different row, or at none.
-            .onChange(of: vm.clipboardFilter) { land() }
+            .onChange(of: vm.clipboardFilter) { land(restoringSelection: true) }
             // The filter is part of the query, so narrowing re-runs it rather than thinning rows.
             .onChange(of: vm.fileSearchFilter) {
                 land()
@@ -424,7 +424,7 @@ struct RootPaletteView: View {
                 vm.emojiCategoryFilter = .all
                 vm.emojiGridColumnsOverride = nil
                 if menuOpen { closeMenus() }
-                land(restoringNavigation: true)
+                land(restoringSelection: true)
                 searchFocused = !screen.hidesSearchField
                 if vm.mode != .uninstall { uninstall.cancel() }
                 // Entering with no query is the blank screen's own request for recents.
@@ -788,15 +788,11 @@ struct RootPaletteView: View {
                 Text("Quick AI")
                     .font(metrics.typography.bar)
                     .foregroundStyle(Theme.Colors.textSecondary)
-                SymbolImage(
-                    name: CommandID.quickAI.sfSymbol,
-                    size: metrics.scaled(Theme.Typography.menuSymbolSize), monochrome: true
-                )
-                .foregroundStyle(Theme.Colors.textSecondary)
-                .accessibilityHidden(true)
+                KeyCapChip(text: "⇥", style: .outline)
+                    .accessibilityHidden(true)
             }
         }
-        .help("Ask Quick AI")
+        .help("Press Tab to ask Quick AI")
     }
 
     /// Resolved through `PaletteTabAction`, so the hint cannot promise the wrong destination.
@@ -1264,8 +1260,8 @@ struct RootPaletteView: View {
     // MARK: - Actions
 
     /// Every reset lands here, so handlers that fire together agree in whatever order they run.
-    private func land(restoringNavigation: Bool = false) {
-        let restored = restoringNavigation ? vm.restoredSelection : nil
+    private func land(restoringSelection: Bool = false) {
+        let restored = restoringSelection ? vm.restoredSelection : nil
         let landing = restored.map { min($0, max(screen.rows.count - 1, 0)) } ?? screen.landingSelection
         vm.selection = landing
         scroll = ScrollIntent(kind: restored != nil ? .follow : landing == 0 ? .top : .center)

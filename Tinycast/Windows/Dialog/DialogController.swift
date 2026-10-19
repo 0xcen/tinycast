@@ -94,6 +94,19 @@ final class DialogController: NSObject, NSWindowDelegate {
         return state.values
     }
 
+    func editClipboardText(_ text: String) async -> String? {
+        let state = ClipboardEditState(text: text)
+        let request = DialogRequest(
+            title: String(localized: "Edit Entry"), message: String(localized: "⌘↵ saves."), symbol: nil,
+            actions: [
+                DialogAction(title: String(localized: "Save")),
+                DialogAction(title: String(localized: "Cancel"), role: .cancel)
+            ],
+            defaultIndex: 0, cancelIndex: 1, accessory: .clipboardText(state))
+        guard await present(request) == 0 else { return nil }
+        return state.text
+    }
+
     private func present(_ request: DialogRequest) async -> Int {
         guard continuation == nil else { return request.cancelIndex }
         return await withCheckedContinuation { continuation in
@@ -102,7 +115,7 @@ final class DialogController: NSObject, NSWindowDelegate {
             let width =
                 switch request.accessory {
                 case nil, .volume: metrics.size.dialogCompactWidth
-                case .snippetArguments: metrics.size.dialogWidth
+                case .snippetArguments, .clipboardText: metrics.size.dialogWidth
                 }
             let content = hostingView(
                 DialogView(
@@ -113,6 +126,7 @@ final class DialogController: NSObject, NSWindowDelegate {
                 width: width, minHeight: 0)
             let panel = DialogPanel(content: content, cornerRadius: metrics.radius.panel)
             panel.handlesArrowKeys = request.accessory?.claimsArrowKeys ?? false
+            panel.acceptsLineBreaks = request.accessory?.acceptsLineBreaks ?? false
             panel.delegate = self
             panel.onKey = { [weak self] key in
                 guard let self else { return }

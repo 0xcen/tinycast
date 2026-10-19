@@ -22,7 +22,7 @@ private func commandEscapeTapCallback(
     return claimed ? nil : Unmanaged.passUnretained(event)
 }
 
-/// ⌘⎋ is claimed upstream of every app, so the palette takes it where it enters the system.
+/// ⌘esc is claimed upstream of every app, so the palette takes it where it enters the system.
 ///
 /// The window server binds the chord itself, so it never reaches `onCommandShortcut` the way ⌘.
 /// and ⌘w do: no keystroke is left by the time the responder chain runs, and a head-inserted HID
@@ -43,7 +43,7 @@ final class CommandEscapeTap {
         tearDown()
     }
 
-    /// True only for a bare ⌘⎋: any further modifier spells somebody else's chord.
+    /// True only for a bare ⌘esc: any further modifier spells somebody else's chord.
     nonisolated static func isChord(keyCode: Int64, flags: CGEventFlags) -> Bool {
         keyCode == Int64(kVK_Escape)
             && flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift])
