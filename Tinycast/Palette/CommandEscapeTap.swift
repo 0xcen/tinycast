@@ -1,16 +1,17 @@
-import AppKit
 import Carbon.HIToolbox
+import CoreGraphics
+import Foundation
+import Synchronization
 
-/// C entry point: the decision is a key-code compare, so it is made here rather than crossing out.
 private func commandEscapeTapCallback(
     proxy: CGEventTapProxy, type: CGEventType, event: CGEvent,
     userInfo: UnsafeMutableRawPointer?
 ) -> Unmanaged<CGEvent>? {
     guard let userInfo else { return Unmanaged.passUnretained(event) }
-    let tap = Unmanaged<CommandEscapeTap>.fromOpaque(userInfo).takeUnretainedValue()
+    let thread = Unmanaged<TapThread>.fromOpaque(userInfo).takeUnretainedValue()
 
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-        MainActor.assumeIsolated { tap.reenable() }
+        thread.send(.disabledBySystem)
         return Unmanaged.passUnretained(event)
     }
     guard
@@ -18,8 +19,8 @@ private func commandEscapeTapCallback(
             keyCode: event.getIntegerValueField(.keyboardEventKeycode), flags: event.flags)
     else { return Unmanaged.passUnretained(event) }
 
-    let claimed = MainActor.assumeIsolated { tap.fire() }
-    return claimed ? nil : Unmanaged.passUnretained(event)
+    thread.send(.chord)
+    return nil
 }
 
 /// ⌘esc is claimed upstream of every app, so the palette takes it where it enters the system.
@@ -29,13 +30,13 @@ private func commandEscapeTapCallback(
 /// tap is the one place earlier than that. See docs/features/palette.md.
 @MainActor
 final class CommandEscapeTap {
-    /// Claims the chord and returns true, or declines it so the rest of the system still gets it.
-    private let onChord: () -> Bool
+    private let onChord: () -> Void
 
     private var tapPort: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
+    private var thread: TapThread?
+    private var isEnabled = false
 
-    init(onChord: @escaping () -> Bool) {
+    init(onChord: @escaping () -> Void) {
         self.onChord = onChord
     }
 
@@ -50,19 +51,22 @@ final class CommandEscapeTap {
                 == .maskCommand
     }
 
-    /// Called on every show: a tap refused for want of Accessibility is retried the next time.
+    /// Called whenever the panel takes key: a tap refused for want of Accessibility is retried then.
     func enable() {
+        isEnabled = true
         guard let port = installIfNeeded() else { return }
         CGEvent.tapEnable(tap: port, enable: true)
     }
 
     func disable() {
+        isEnabled = false
         guard let tapPort else { return }
         CGEvent.tapEnable(tap: tapPort, enable: false)
     }
 
     private func installIfNeeded() -> CFMachPort? {
         if let tapPort { return tapPort }
+        let thread = TapThread { [weak self] signal in self?.receive(signal) }
         // Head of the HID stream: anywhere later and the system hotkey has already eaten the chord.
         guard
             let port = CGEvent.tapCreate(
@@ -71,33 +75,74 @@ final class CommandEscapeTap {
                 options: .defaultTap,
                 eventsOfInterest: 1 << CGEventType.keyDown.rawValue,
                 callback: commandEscapeTapCallback,
-                userInfo: Unmanaged.passUnretained(self).toOpaque()),
-            let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0)
+                userInfo: Unmanaged.passUnretained(thread).toOpaque())
         else { return nil }
+        // A created tap is already live, and one nobody services stalls every keystroke.
+        guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0) else {
+            CFMachPortInvalidate(port)
+            return nil
+        }
+        thread.start(running: source)
         tapPort = port
-        runLoopSource = source
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        self.thread = thread
         return port
     }
 
+    private func receive(_ signal: TapThread.Signal) {
+        switch signal {
+        case .chord:
+            onChord()
+        case .disabledBySystem:
+            guard isEnabled, let tapPort else { return }
+            CGEvent.tapEnable(tap: tapPort, enable: true)
+        }
+    }
+
     private func tearDown() {
-        if let runLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
-            self.runLoopSource = nil
+        guard let tapPort else { return }
+        CGEvent.tapEnable(tap: tapPort, enable: false)
+        CFMachPortInvalidate(tapPort)
+        thread?.stop()
+        self.tapPort = nil
+        thread = nil
+    }
+}
+
+/// An active HID tap holds all input behind it until it answers, so it never waits on main.
+private final class TapThread: Sendable {
+    enum Signal {
+        case chord
+        case disabledBySystem
+    }
+
+    private let onSignal: @MainActor @Sendable (Signal) -> Void
+    private let runLoop = Mutex<CFRunLoop?>(nil)
+
+    init(onSignal: @escaping @MainActor @Sendable (Signal) -> Void) {
+        self.onSignal = onSignal
+    }
+
+    /// The thread retains `self` until its loop returns, so the callback's pointer never dangles.
+    func start(running source: CFRunLoopSource) {
+        // Handed over once and never touched here again; CF run loop calls are thread-safe.
+        nonisolated(unsafe) let source = source
+        let thread = Thread { [self] in
+            runLoop.withLock { $0 = CFRunLoopGetCurrent() }
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+            CFRunLoopRun()
         }
-        if let tapPort {
-            CGEvent.tapEnable(tap: tapPort, enable: false)
-            CFMachPortInvalidate(tapPort)
-            self.tapPort = nil
+        thread.name = "CommandEscapeTap"
+        thread.qualityOfService = .userInteractive
+        thread.start()
+    }
+
+    func stop() {
+        runLoop.withLock { runLoop in
+            if let runLoop { CFRunLoopStop(runLoop) }
         }
     }
 
-    fileprivate func fire() -> Bool {
-        onChord()
-    }
-
-    /// The system disables a tap it thinks is too slow; ours only ever compares two integers.
-    fileprivate func reenable() {
-        if let tapPort { CGEvent.tapEnable(tap: tapPort, enable: true) }
+    func send(_ signal: Signal) {
+        Task { @MainActor [onSignal] in onSignal(signal) }
     }
 }

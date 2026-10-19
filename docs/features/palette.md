@@ -565,8 +565,11 @@ handled in `PalettePanel.sendEvent` before `super` hands the event to the respon
   in the responder chain compiles, runs never, and looks like a palette bug. `CommandEscapeTap`
   takes it at the head of the HID stream instead, the one place earlier than the system's own
   binding, and `prepare(mode: .launcher)`s: one chord back to the root search from any depth, window
-  still open. The tap is enabled only while the palette is on screen, watches `keyDown` alone, and
-  declines the chord whenever the panel is not key, so nothing else on the system loses ⌘esc to it.
+  still open. The tap is enabled only while the panel is key and watches `keyDown` alone, so
+  nothing else on the system loses ⌘esc to it. It runs on its own thread and only hops to main to
+  act: an active HID tap holds all input behind it until it answers, so on the main run loop any
+  main-actor stall would freeze the whole Mac. A system timeout disable is undone only while the
+  owner still wants the tap on.
   It is a modifying tap, so it needs Accessibility — without that grant the chord is simply
   unavailable, which is the only path this codebase has to it.
 
