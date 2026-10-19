@@ -37,7 +37,8 @@ extension CGEvent {
         let (fail, gate) = fixture.withLock { fixture in
             fixture.attempts += 1
             fixture.touchedMainThread = fixture.touchedMainThread || Thread.isMainThread
-            fixture.wrongConfiguration = fixture.wrongConfiguration
+            fixture.wrongConfiguration =
+                fixture.wrongConfiguration
                 || tap != .cghidEventTap || place != .headInsertEventTap
                 || options != .defaultTap || eventsOfInterest != 1 << CGEventType.keyDown.rawValue
             let fail = fixture.failNext
@@ -51,8 +52,9 @@ extension CGEvent {
         guard let port = CFMachPortCreate(kCFAllocatorDefault, { _, _, _, _ in }, &context, nil)
         else { return nil }
         fixture.withLock {
-            $0.records.append(TapRecord(
-                port: port, runLoop: CFRunLoopGetCurrent(), callback: callback, userInfo: userInfo))
+            $0.records.append(
+                TapRecord(
+                    port: port, runLoop: CFRunLoopGetCurrent(), callback: callback, userInfo: userInfo))
         }
         if let gate {
             gate.entered.signal()
@@ -128,7 +130,8 @@ struct CommandEscapeTapTests {
             result.withLock { $0 = claimed }
             completed.signal()
         }
-        expect(completed.wait(timeout: .now() + 2) == .success,
+        expect(
+            completed.wait(timeout: .now() + 2) == .success,
             "the worker returns while the main thread is blocked")
         return result.withLock { $0 }
     }
@@ -203,10 +206,12 @@ struct CommandEscapeTapTests {
         fixture.withLock { $0.failNext = true }
         let attempts = fixture.withLock { $0.attempts }
         tap.enable()
-        await waitFor("a refused tap can retry on the next enable", {
-            tap.enable()
-            return fixture.withLock { $0.attempts >= attempts + 2 && $0.records.count == 4 }
-        })
+        await waitFor(
+            "a refused tap can retry on the next enable",
+            {
+                tap.enable()
+                return fixture.withLock { $0.attempts >= attempts + 2 && $0.records.count == 4 }
+            })
         expect(deliver(3) == true, "a retried installation handles the chord")
         await waitFor("the retry dispatches normally", { fires == 3 })
         tap.disable()
@@ -225,9 +230,11 @@ struct CommandEscapeTapTests {
             tap.enable()
             tap.disable()
         }
-        await waitFor("rapid show and hide leaves no valid ports", {
-            fixture.withLock { $0.records.allSatisfy { !CFMachPortIsValid($0.port) } }
-        })
+        await waitFor(
+            "rapid show and hide leaves no valid ports",
+            {
+                fixture.withLock { $0.records.allSatisfy { !CFMachPortIsValid($0.port) } }
+            })
         expect(fixture.withLock { !$0.wrongConfiguration }, "the tap keeps the required HID signature")
         expect(fixture.withLock { !$0.touchedMainThread }, "tap installation and control stay off main")
         expect(fires == 3, "closed sessions never deliver an action")
