@@ -279,6 +279,7 @@ run form-input-test        Tinycast/Platform/Appearance.swift \
 run scroll-reveal-test     Tinycast/DesignSystem/Scrolling/SelectionReveal.swift
 run redaction-test         Tinycast/DesignSystem/RedactedPlaceholder.swift
 run keyboard-focus-test    Tinycast/DesignSystem/Interaction/KeyboardFocus.swift
+run command-escape-tap-test Tinycast/Palette/CommandEscapeTap.swift
 run palette-escape-test    Tinycast/Palette/PaletteMode.swift \
                            Tinycast/Palette/PaletteEscapeAction.swift \
                            Tinycast/Palette/CommandEscapeTap.swift \
