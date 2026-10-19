@@ -95,7 +95,6 @@ final class DialogController: NSObject, NSWindowDelegate {
     }
 
     private func present(_ request: DialogRequest) async -> Int {
-        // Keyed on the continuation, so a panel still fading can't swallow the next.
         guard continuation == nil else { return request.cancelIndex }
         return await withCheckedContinuation { continuation in
             self.continuation = continuation
@@ -130,30 +129,12 @@ final class DialogController: NSObject, NSWindowDelegate {
             }
             self.panel = panel
             place(panel)
-            show(panel)
+            // Non-activating like the palette: key focus without pulling the user out.
+            panel.makeKeyAndOrderFront(nil)
+            panel.orderFrontRegardless()
         }
     }
 
-    /// Moves the full-size glass panel, avoiding the transient rim caused by scaling its content.
-    private func show(_ panel: NSPanel) {
-        let destination = panel.frame
-        panel.alphaValue = Theme.DialogMotion.initialOpacity
-        panel.setFrameOrigin(
-            NSPoint(x: destination.minX, y: destination.minY - Theme.DialogMotion.offset))
-        // Non-activating like the palette: key focus without pulling the user out.
-        panel.makeKeyAndOrderFront(nil)
-        panel.orderFrontRegardless()
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = Theme.Duration.dialogEnter
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            // Moving a cached surface avoids redrawing the glass at each whole-point frame step.
-            panel.animator().setFrame(destination, display: false)
-            panel.animator().alphaValue = 1
-        }
-    }
-
-    /// Resumes before the fade finishes, so a confirmation isn't held up by animation.
     private func finish(_ index: Int) {
         guard let continuation else { return }
         self.continuation = nil
@@ -163,7 +144,7 @@ final class DialogController: NSObject, NSWindowDelegate {
         closing?.delegate = nil
         closing?.onKey = nil
         continuation.resume(returning: index)
-        closing?.fadeOut(duration: Theme.Duration.dialogExit)
+        closing?.orderOut(nil)
     }
 
     private var metrics: InterfaceMetrics { settings.interfaceSize.metrics }

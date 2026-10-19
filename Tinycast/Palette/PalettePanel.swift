@@ -271,7 +271,7 @@ final class PalettePanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
-        animationBehavior = .none
+        animationBehavior = .documentWindow
         isReleasedWhenClosed = false
 
         let hosting = NSHostingView(rootView: rootView)

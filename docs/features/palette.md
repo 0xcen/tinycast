@@ -494,13 +494,12 @@ The panel is a second SwiftUI hierarchy, so it observes nothing of `RootPaletteV
 `paletteEnvironment` injects the same stores into both hierarchies so they cannot drift.
 `WindowReader` reports the palette's `NSWindow`, which the menu's frame is placed against.
 
-`PaletteMenuContent` may supply its own host-layer clip path and motion.
-The hosting layer scales inside a canvas sized for the largest frame, anchored to the button or
-header control that opened it, so neither the surface nor its shadow is cropped. AppKit refreshes
-the shadow after layout and display. Native `PopoverMenu` content reads its motion from
-`Theme.MenuMotion`; extension menus supply values owned by `Features/Extensions`, so launcher
-changes cannot silently alter an extension surface. Each extension menu also supplies its own clip
-path; the controller applies it as an opaque value and never reconstructs extension geometry.
+`PaletteMenuContent` may supply its own host-layer clip path. `MenuPanel` uses
+`animationBehavior = .documentWindow`, so every menu opens and closes with AppKit's native window
+animation and has no motion of its own. The close animation keeps drawing the panel after
+`orderOut`, so the controller releases the hosted tree from `orderOutAnimated`, once it is off screen. AppKit refreshes the shadow after layout and display. Each extension menu supplies its
+own clip path; the controller applies it as an opaque value and never reconstructs extension
+geometry.
 
 ## Menu-open input freeze
 
@@ -514,7 +513,7 @@ caret, mouse selection and standard editing commands.
   keeps ↑/↓, ↵, Tab and action chords on the menu while leaving text editing, selection and
   clipboard commands to AppKit.
 - The palette window delegate ignores this intentional key transfer. Losing key status to anything
-  else still dismisses the palette, and closing the child restores key status before it fades out.
+  else still dismisses the palette, and closing the child restores key status before it orders out.
 - The caret is hidden by clearing SwiftUI's **own** live field editor's `insertionPointColor`. SwiftUI
   force-casts its field editor to a private subclass, so vending a custom one crashes. The searchable
   menu draws no caret of its own; AppKit draws the caret in its field editor.

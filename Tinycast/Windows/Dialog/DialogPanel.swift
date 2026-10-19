@@ -31,7 +31,7 @@ final class DialogPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
-        animationBehavior = .none
+        animationBehavior = .documentWindow
         isReleasedWhenClosed = false
         content.wantsLayer = true
         content.layer?.cornerRadius = cornerRadius
