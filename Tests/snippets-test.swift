@@ -951,6 +951,66 @@ struct SnippetsTests {
                 readbacks: Array(repeating: "", count: 29) + ["text"]) == .delivered)
 
         check(
+            "the never-type switch turns an unchanged write into delivered",
+            TextReplacementPolicy.effectiveOutcome(
+                .unavailable, writeAttempted: true, neverTypeAfterWrite: true) == .delivered)
+        check(
+            "a switch-converted write never falls back to events",
+            !TextReplacementPolicy.effectiveOutcome(
+                .unavailable, writeAttempted: true, neverTypeAfterWrite: true).fallsBackToEvents)
+        check(
+            "the never-type switch turns a rejected readback into delivered",
+            TextReplacementPolicy.effectiveOutcome(
+                .rejected, writeAttempted: true, neverTypeAfterWrite: true) == .delivered)
+        check(
+            "a write error is treated like an unconfirmed write by the switch",
+            TextReplacementPolicy.effectiveOutcome(
+                .unavailable, writeAttempted: true, neverTypeAfterWrite: true) == .delivered)
+        check(
+            "with the switch on, no post-write outcome falls back to typing",
+            [AccessibilityReplacement.unavailable, .rejected, .delivered].allSatisfy {
+                !TextReplacementPolicy.effectiveOutcome(
+                    $0, writeAttempted: true, neverTypeAfterWrite: true).fallsBackToEvents
+            })
+        check(
+            "the never-type switch leaves a pre-write failure eligible for typing",
+            TextReplacementPolicy.effectiveOutcome(
+                .unavailable, writeAttempted: false, neverTypeAfterWrite: true) == .unavailable)
+        check(
+            "the never-type switch off leaves an unchanged write unavailable",
+            TextReplacementPolicy.effectiveOutcome(
+                .unavailable, writeAttempted: true, neverTypeAfterWrite: false) == .unavailable)
+        check(
+            "the never-type switch off leaves a rejected readback rejected",
+            TextReplacementPolicy.effectiveOutcome(
+                .rejected, writeAttempted: true, neverTypeAfterWrite: false) == .rejected)
+        check(
+            "the never-type switch off leaves a confirmed write delivered",
+            TextReplacementPolicy.effectiveOutcome(
+                .delivered, writeAttempted: true, neverTypeAfterWrite: false) == .delivered)
+
+        check(
+            "150 ms reads back 30 times",
+            TextReplacementPolicy.writeConfirmationReadCount(milliseconds: 150) == 30)
+        check(
+            "0 ms reads back once",
+            TextReplacementPolicy.writeConfirmationReadCount(milliseconds: 0) == 1)
+        check(
+            "2000 ms reads back 400 times",
+            TextReplacementPolicy.writeConfirmationReadCount(milliseconds: 2000) == 400)
+        check(
+            "a negative window clamps to one read",
+            TextReplacementPolicy.writeConfirmationReadCount(milliseconds: -50) == 1)
+        check(
+            "a window above the cap clamps to 400 reads",
+            TextReplacementPolicy.writeConfirmationReadCount(milliseconds: 9999) == 400)
+        check(
+            "the window clamps to 0...2000",
+            TextReplacementPolicy.clampedWriteConfirmationMilliseconds(-1) == 0
+                && TextReplacementPolicy.clampedWriteConfirmationMilliseconds(2001) == 2000
+                && TextReplacementPolicy.clampedWriteConfirmationMilliseconds(150) == 150)
+
+        check(
             "a Unicode keystroke never carries more than Blink's four-unit cap",
             UnicodeTypingChunk.split(String(repeating: "a", count: 30))
                 .allSatisfy { $0.count <= UnicodeTypingChunk.maxUTF16Units })
@@ -2144,6 +2204,8 @@ final class ClipboardManager {
 @MainActor
 final class AppSettings {
     var snippetsEnabled = false
+    var dictationDebugWriteConfirmationMilliseconds = 150
+    var dictationDebugNeverTypeAfterAccessibilityWrite = false
 }
 
 enum Permissions {

@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import OSLog
 
 /// Its own shape, not a caller's result type, so the injector stays owned by no one feature.
 struct InjectedText: Equatable, Sendable {
@@ -26,6 +27,14 @@ enum AccessibilityReplacement: Equatable {
 
     /// `.rejected` means the document is not the one we measured, so events would edit the wrong text.
     var fallsBackToEvents: Bool { self == .unavailable }
+
+    fileprivate var logName: String {
+        switch self {
+        case .delivered: "delivered"
+        case .unavailable: "unavailable"
+        case .rejected: "rejected"
+        }
+    }
 }
 
 /// The two judgements a replacement makes, kept pure so the harness can drive both tiers.
@@ -67,6 +76,30 @@ enum TextReplacementPolicy {
         }
         return .unavailable
     }
+
+    static let writeConfirmationReadIntervalMilliseconds = 5
+    static let maximumWriteConfirmationMilliseconds = 2_000
+
+    static func clampedWriteConfirmationMilliseconds(_ milliseconds: Int) -> Int {
+        min(max(milliseconds, 0), maximumWriteConfirmationMilliseconds)
+    }
+
+    static func writeConfirmationReadCount(milliseconds: Int) -> Int {
+        max(
+            1,
+            clampedWriteConfirmationMilliseconds(milliseconds)
+                / writeConfirmationReadIntervalMilliseconds)
+    }
+
+    /// The debug switch makes any attempted write final, so no fallback can type over the document.
+    static func effectiveOutcome(
+        _ measured: AccessibilityReplacement,
+        writeAttempted: Bool,
+        neverTypeAfterWrite: Bool
+    ) -> AccessibilityReplacement {
+        guard writeAttempted, neverTypeAfterWrite else { return measured }
+        return .delivered
+    }
 }
 
 @MainActor
@@ -102,6 +135,8 @@ final class DeliveryCompletion {
 @MainActor
 final class TextInjector {
     typealias AutomaticGeneration = UInt
+
+    private static let logger = Logger(subsystem: "com.tinycast", category: "TextInjection")
 
     private let clipboardManager: ClipboardManager
     private let settings: AppSettings
@@ -335,6 +370,11 @@ final class TextInjector {
         completion: DeliveryCompletion
     ) async {
         defer { completion.settle() }
+        Self.logger.debug(
+            """
+            route=in-process-editor bundle=\(Bundle.main.bundleIdentifier ?? "none", privacy: .public) \
+            utf16=\(injected.text.utf16.count, privacy: .public)
+            """)
         for _ in 0..<Self.convergenceAttempts {
             // The tap runs ahead of AppKit, so looking before the wait reads a stale view as a miss.
             if keywordLength > 0 {
@@ -391,6 +431,12 @@ final class TextInjector {
             expectedKeyword: expectedKeyword,
             keywordLength: keywordLength,
             automaticGeneration: automaticGeneration)
+        Self.logger.debug(
+            """
+            route=ax bundle=\(targetApp?.bundleIdentifier ?? "none", privacy: .public) \
+            outcome=\(accessibilityReplacement.logName, privacy: .public) \
+            fallback=\(accessibilityReplacement.fallsBackToEvents, privacy: .public)
+            """)
         if accessibilityReplacement == .delivered {
             completion.confirm()
             return
@@ -436,6 +482,7 @@ final class TextInjector {
             text.count <= 100
             && !text.contains("\n")
             && !text.contains("\r")
+        let bundleID = targetApp?.bundleIdentifier ?? "none"
         if isShortSingleLine {
             return await deliverUsingUnicodeEvents(
                 text,
@@ -445,12 +492,19 @@ final class TextInjector {
         }
 
         guard let lease = beginTemporaryPasteboardLease(text) else {
+            Self.logger.debug(
+                "route=events-unicode bundle=\(bundleID, privacy: .public) fallbackFrom=events-paste")
             return await deliverUsingUnicodeEvents(
                 text,
                 keywordLength: keywordLength,
                 targetApp: targetApp,
                 automaticGeneration: automaticGeneration)
         }
+        Self.logger.debug(
+            """
+            route=events-paste bundle=\(bundleID, privacy: .public) \
+            keywordLength=\(keywordLength, privacy: .public) utf16=\(text.utf16.count, privacy: .public)
+            """)
         activePasteboardLease = lease
         defer { finish(lease) }
 
@@ -488,6 +542,11 @@ final class TextInjector {
         targetApp: NSRunningApplication?,
         automaticGeneration: AutomaticGeneration?
     ) async -> Bool {
+        Self.logger.debug(
+            """
+            route=events-unicode bundle=\(targetApp?.bundleIdentifier ?? "none", privacy: .public) \
+            keywordLength=\(keywordLength, privacy: .public) utf16=\(text.utf16.count, privacy: .public)
+            """)
         guard let insertionEvents = makeUnicodeEvents(text),
             let deletionEvents = makeDeletionEvents(count: keywordLength),
             deliveryIsAllowed(
@@ -654,60 +713,131 @@ final class TextInjector {
         automaticGeneration: AutomaticGeneration?
     ) async -> AccessibilityReplacement {
         guard let targetApp else { return .unavailable }
+        let bundleID = targetApp.bundleIdentifier ?? "none"
         let state = await accessibilityTarget(
             in: targetApp,
             expectedKeyword: expectedKeyword,
             keywordLength: keywordLength,
             automaticGeneration: automaticGeneration)
         guard case .ready(let target) = state else {
-            if case .rejected = state { return .rejected }
+            if case .rejected = state {
+                Self.logger.debug("ax target bundle=\(bundleID, privacy: .public) state=rejected")
+                return .rejected
+            }
+            Self.logger.debug("ax target bundle=\(bundleID, privacy: .public) state=unavailable")
             return .unavailable
         }
 
         guard setSelectedRange(target.replacementRange, in: target.element) else {
-            return .unavailable
-        }
-        guard
-            AXUIElementSetAttributeValue(
-                target.element,
-                kAXSelectedTextAttribute as CFString,
-                injected.text as CFString) == .success
-        else {
-            _ = setSelectedRange(target.originalRange, in: target.element)
+            Self.logger.debug("ax range bundle=\(bundleID, privacy: .public) outcome=unavailable")
             return .unavailable
         }
 
+        let neverType = settings.dictationDebugNeverTypeAfterAccessibilityWrite
+        let readCount = TextReplacementPolicy.writeConfirmationReadCount(
+            milliseconds: settings.dictationDebugWriteConfirmationMilliseconds)
+        let writeResult = AXUIElementSetAttributeValue(
+            target.element,
+            kAXSelectedTextAttribute as CFString,
+            injected.text as CFString)
+        guard writeResult == .success else {
+            Self.logger.error(
+                """
+                ax write bundle=\(bundleID, privacy: .public) \
+                error=\(writeResult.rawValue, privacy: .public)
+                """)
+            let resolved = TextReplacementPolicy.effectiveOutcome(
+                .unavailable, writeAttempted: true, neverTypeAfterWrite: neverType)
+            if resolved != .delivered {
+                _ = setSelectedRange(target.originalRange, in: target.element)
+            }
+            Self.logFinish(
+                bundleID: bundleID, outcome: resolved, reads: 0, waitedMilliseconds: 0,
+                converted: resolved != .unavailable)
+            return resolved
+        }
+
         var readbacks: [String?] = []
-        for attempt in 0..<Self.writeConfirmationAttempts {
+        var reads = 0
+        var waitedMilliseconds = 0
+        for attempt in 0..<readCount {
             readbacks.append(stringValue(in: target.element))
-            let outcome = TextReplacementPolicy.outcomeAfterWrite(
+            reads += 1
+            let measured = TextReplacementPolicy.outcomeAfterWrite(
                 originalValue: target.value,
                 replacementRange: target.replacementRange,
                 insertedText: injected.text,
                 readbacks: readbacks)
-            if outcome == .delivered {
+            Self.logger.debug(
+                """
+                ax read bundle=\(bundleID, privacy: .public) \
+                attempt=\(attempt + 1, privacy: .public)/\(readCount, privacy: .public) \
+                outcome=\(measured.logName, privacy: .public)
+                """)
+            if measured == .delivered {
                 _ = setSelectedRange(
                     NSRange(
                         location: target.replacementRange.location + injected.caretPrefixLength,
                         length: 0),
                     in: target.element)
+                Self.logFinish(
+                    bundleID: bundleID, outcome: .delivered, reads: reads,
+                    waitedMilliseconds: waitedMilliseconds, converted: false)
                 return .delivered
             }
-            guard outcome == .unavailable, attempt < Self.writeConfirmationAttempts - 1 else {
-                _ = setSelectedRange(target.originalRange, in: target.element)
-                return outcome
+            let resolved = TextReplacementPolicy.effectiveOutcome(
+                measured, writeAttempted: true, neverTypeAfterWrite: neverType)
+            if resolved != .unavailable {
+                if resolved != .delivered {
+                    _ = setSelectedRange(target.originalRange, in: target.element)
+                }
+                Self.logFinish(
+                    bundleID: bundleID, outcome: resolved, reads: reads,
+                    waitedMilliseconds: waitedMilliseconds, converted: resolved != measured)
+                return resolved
             }
-            guard
+            guard attempt < readCount - 1,
                 deliveryIsAllowed(
                     automaticGeneration: automaticGeneration, targetApp: targetApp,
                     promptForInteractiveAccessibility: false),
                 await wait(for: Self.writeConfirmationInterval)
             else {
-                _ = setSelectedRange(target.originalRange, in: target.element)
-                return .rejected
+                let fallback = TextReplacementPolicy.effectiveOutcome(
+                    .rejected, writeAttempted: true, neverTypeAfterWrite: neverType)
+                if fallback != .delivered {
+                    _ = setSelectedRange(target.originalRange, in: target.element)
+                }
+                Self.logFinish(
+                    bundleID: bundleID, outcome: fallback, reads: reads,
+                    waitedMilliseconds: waitedMilliseconds, converted: fallback != .rejected)
+                return fallback
             }
+            waitedMilliseconds += TextReplacementPolicy.writeConfirmationReadIntervalMilliseconds
         }
-        return .unavailable
+        let exhausted = TextReplacementPolicy.effectiveOutcome(
+            .unavailable, writeAttempted: true, neverTypeAfterWrite: neverType)
+        if exhausted != .delivered {
+            _ = setSelectedRange(target.originalRange, in: target.element)
+        }
+        Self.logFinish(
+            bundleID: bundleID, outcome: exhausted, reads: reads,
+            waitedMilliseconds: waitedMilliseconds, converted: exhausted != .unavailable)
+        return exhausted
+    }
+
+    private static func logFinish(
+        bundleID: String,
+        outcome: AccessibilityReplacement,
+        reads: Int,
+        waitedMilliseconds: Int,
+        converted: Bool
+    ) {
+        Self.logger.notice(
+            """
+            ax finish bundle=\(bundleID, privacy: .public) outcome=\(outcome.logName, privacy: .public) \
+            reads=\(reads, privacy: .public) waitedMs=\(waitedMilliseconds, privacy: .public) \
+            converted=\(converted, privacy: .public)
+            """)
     }
 
     /// Rule 2: a renderer applies the keystroke before it says so, so a short lag is not a mismatch.
@@ -788,7 +918,6 @@ final class TextInjector {
     private static let convergenceInterval = Duration.milliseconds(5)
 
     /// Telegram reflects an Accessibility write late, past the convergence budget.
-    private static let writeConfirmationAttempts = 30
     private static let writeConfirmationInterval = Duration.milliseconds(5)
 
     private func waitForPasteConfirmation(

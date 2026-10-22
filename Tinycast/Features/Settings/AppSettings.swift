@@ -394,6 +394,22 @@ final class AppSettings {
         didSet { defaults.set(dictationLanguage, forKey: Key.dictationLanguage.rawValue) }
     }
 
+    var dictationDebugWriteConfirmationMilliseconds: Int {
+        didSet {
+            defaults.set(
+                min(max(dictationDebugWriteConfirmationMilliseconds, 0), 2_000),
+                forKey: Key.dictationDebugWriteConfirmationMilliseconds.rawValue)
+        }
+    }
+
+    var dictationDebugNeverTypeAfterAccessibilityWrite: Bool {
+        didSet {
+            defaults.set(
+                dictationDebugNeverTypeAfterAccessibilityWrite,
+                forKey: Key.dictationDebugNeverTypeAfterAccessibilityWrite.rawValue)
+        }
+    }
+
     var notesRendersMarkdown: Bool {
         didSet { defaults.set(notesRendersMarkdown, forKey: Key.notesRendersMarkdown.rawValue) }
     }
@@ -790,6 +806,16 @@ final class AppSettings {
         dictationLanguage =
             defaults.string(forKey: Key.dictationLanguage.rawValue)
             .flatMap(DictationLanguage.init(rawValue:))?.rawValue
+        dictationDebugWriteConfirmationMilliseconds =
+            defaults.object(forKey: Key.dictationDebugWriteConfirmationMilliseconds.rawValue) == nil
+            ? 150
+            : min(
+                max(
+                    defaults.integer(
+                        forKey: Key.dictationDebugWriteConfirmationMilliseconds.rawValue), 0),
+                2_000)
+        dictationDebugNeverTypeAfterAccessibilityWrite =
+            defaults.bool(forKey: Key.dictationDebugNeverTypeAfterAccessibilityWrite.rawValue)
         notesRendersMarkdown =
             defaults.object(forKey: Key.notesRendersMarkdown.rawValue) == nil
             || defaults.bool(forKey: Key.notesRendersMarkdown.rawValue)

@@ -64,6 +64,9 @@ enum SettingsFileKey: String, CaseIterable, Sendable {
     case dictationLiveInsertion = "dictation.liveInsertion"
     case dictationIdleRelease = "dictation.releaseAfterMinutes"
     case dictationLanguage = "dictation.language"
+    case dictationDebugWriteConfirmationMilliseconds = "dictation.debugWriteConfirmationMilliseconds"
+    case dictationDebugNeverTypeAfterAccessibilityWrite =
+        "dictation.debugNeverTypeAfterAccessibilityWrite"
     case fileSearchEnabled = "fileSearch.enabled"
     case fileSearchScopes = "fileSearch.scopes"
     case fileSearchIgnorePatterns = "fileSearch.ignorePatterns"

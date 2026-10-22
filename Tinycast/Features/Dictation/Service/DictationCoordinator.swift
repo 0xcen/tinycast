@@ -1,10 +1,13 @@
 import AppKit
 import AVFoundation
+import OSLog
 
 @MainActor
 @Observable
 final class DictationCoordinator {
     private enum Phase { case idle, starting, listening, transcribing, stopping }
+
+    private static let logger = Logger(subsystem: "com.tinycast", category: "TextInjection")
 
     private let settings: AppSettings
     private let hotKeys: HotKeyManager
@@ -242,6 +245,11 @@ final class DictationCoordinator {
                 let target = self.target
                 let assembled = liveText + text
                 guard !text.isEmpty else { finishWithoutRemainder(destination); return }
+                Self.logger.debug(
+                    """
+                    dictation pass=final bundle=\(target?.externalApp?.bundleIdentifier ?? "none", privacy: .public) \
+                    utf16=\(text.utf16.count, privacy: .public)
+                    """)
                 panel.close()
                 if destination.pastes {
                     injector.deliver(
@@ -339,6 +347,11 @@ final class DictationCoordinator {
             guard !stripped.isEmpty else { return }
             liveText += stripped
             let target = self.target
+            Self.logger.debug(
+                """
+                dictation pass=live bundle=\(target?.externalApp?.bundleIdentifier ?? "none", privacy: .public) \
+                utf16=\(stripped.utf16.count, privacy: .public)
+                """)
             injector.deliver(
                 InjectedText(stripped), target: target, expectedKeyword: nil,
                 keywordLength: 0, automaticGeneration: nil,

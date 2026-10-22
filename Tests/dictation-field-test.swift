@@ -316,6 +316,8 @@ final class AppSettings {
     var dictationDestination = DictationDestination.copy
     var dictationAdaptsCapitalization = true
     var dictationLiveInsertion = false
+    var dictationDebugWriteConfirmationMilliseconds = 150
+    var dictationDebugNeverTypeAfterAccessibilityWrite = false
 }
 
 enum HotKeyAction { case dictation }

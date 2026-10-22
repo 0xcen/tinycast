@@ -194,6 +194,53 @@ struct DictationSettingsView: View {
                     )
                 }
 
+                Section {
+                    LabeledContent {
+                        HStack(spacing: 8) {
+                            Text(
+                                verbatim:
+                                    "\(settings.dictationDebugWriteConfirmationMilliseconds) ms"
+                            )
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            Slider(
+                                value: Binding(
+                                    get: {
+                                        Double(
+                                            settings.dictationDebugWriteConfirmationMilliseconds)
+                                    },
+                                    set: {
+                                        settings.dictationDebugWriteConfirmationMilliseconds =
+                                            Int($0)
+                                    }),
+                                in: 0...2000,
+                                step: 10
+                            )
+                        }
+                    } label: {
+                        VStack(alignment: .leading) {
+                            Text(verbatim: "Write confirmation window")
+                            Text(verbatim: "How long to read back after an Accessibility write.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Toggle(isOn: $settings.dictationDebugNeverTypeAfterAccessibilityWrite) {
+                        VStack(alignment: .leading) {
+                            Text(verbatim: "Never type after an Accessibility write")
+                            Text(verbatim: "Treat any attempted Accessibility write as delivered.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text(verbatim: "Debug")
+                } footer: {
+                    Text(
+                        verbatim:
+                            "Test build only. Applies to every Accessibility insertion, not just dictation."
+                    )
+                }
             }
         }
         .formStyle(.grouped)

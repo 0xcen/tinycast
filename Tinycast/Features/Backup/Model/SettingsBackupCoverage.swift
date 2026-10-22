@@ -94,6 +94,10 @@ enum SettingsBackupCoverage {
             "Dictation preferences stay local until backup supports them.",
         AppSettingsKey.dictationIdleRelease.rawValue:
             "Dictation memory use stays a device-local preference.",
+        AppSettingsKey.dictationDebugWriteConfirmationMilliseconds.rawValue:
+            "A test-build dial for this Mac's timing, not a preference a backup should carry.",
+        AppSettingsKey.dictationDebugNeverTypeAfterAccessibilityWrite.rawValue:
+            "A test-build delivery override; an import must not stop this Mac typing after a write.",
         AppSettingsKey.clipboardTextSearchEnabled.rawValue:
             "Background OCR is an opt-in processing choice on this Mac; a backup must not enable it.",
         AppSettingsKey.snippetsEnabled.rawValue:
