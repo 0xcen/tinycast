@@ -8,15 +8,20 @@ final class ParakeetRecognizer {
     private let joint: MLModel
     private let vocabulary: [Int: String]
     private let blank: Int
+    private let stripsNonTextTokens: Bool
     private static let windowSamples = 240_000
 
-    init(directory: URL, model: DictationModel) throws {
+    convenience init(directory: URL, model: DictationModel) throws {
         guard let configuration = model.parakeetConfiguration else {
             throw DictationInferenceError.incompatibleModel
         }
+        try self.init(directory: directory, configuration: configuration)
+    }
+
+    init(directory: URL, configuration: DictationModel.ParakeetConfiguration) throws {
         preprocessor = try DictationTensor.load("Preprocessor", at: directory, units: .cpuOnly)
         encoder = try DictationTensor.load(
-            "Encoder", at: directory,
+            configuration.encoder, at: directory,
             units: configuration.encoderUsesGPU ? .cpuAndGPU : .cpuAndNeuralEngine)
         decoder = try DictationTensor.load("Decoder", at: directory, units: .cpuAndNeuralEngine)
         joint = try DictationTensor.load(
@@ -33,6 +38,12 @@ final class ParakeetRecognizer {
                 return (id, value)
             })
         blank = configuration.blankToken
+        stripsNonTextTokens = configuration.stripsNonTextTokens
+    }
+
+    private func shouldSkip(token: Int, piece: String) -> Bool {
+        DictationCustomModel.skipsToken(
+            id: token, piece: piece, stripsNonTextTokens: stripsNonTextTokens)
     }
 
     func transcribe(_ samples: [Float]) throws -> String {
@@ -106,7 +117,9 @@ final class ParakeetRecognizer {
                 throw DictationInferenceError.incompatibleModel
             }
             if token != blank {
-                if let piece = vocabulary[token], !piece.hasPrefix("<|") { pieces.append(piece) }
+                if let piece = vocabulary[token], !shouldSkip(token: token, piece: piece) {
+                    pieces.append(piece)
+                }
                 projection = try advance(token)
                 emissions += 1
             }

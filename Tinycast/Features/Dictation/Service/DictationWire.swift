@@ -18,10 +18,15 @@ nonisolated enum DictationWire {
 
     struct Request: Codable, Sendable {
         let id: UUID
-        let model: DictationModel
+        let target: Target
         let directory: URL
         let sampleCount: Int
         let language: String?
+    }
+
+    enum Target: Codable, Equatable, Sendable {
+        case builtIn(DictationModel)
+        case custom(DictationModel.ParakeetConfiguration)
     }
 
     struct Response: Codable, Sendable {

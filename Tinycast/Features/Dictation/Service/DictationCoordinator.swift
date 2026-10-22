@@ -115,7 +115,29 @@ final class DictationCoordinator {
     }
 
     var isEnabled: Bool { settings.dictationEnabled }
-    var hasModel: Bool { models.isInstalled(settings.dictationModel) }
+    /// A persisted selection whose model is missing falls back to the built-in one.
+    private var usesCustomModel: Bool { settings.dictationUsesCustomModel && models.hasCustomModel }
+    var hasModel: Bool { usesCustomModel || models.isInstalled(settings.dictationModel) }
+
+    private var currentTarget: DictationWire.Target {
+        if usesCustomModel, let configuration = models.customConfiguration {
+            return .custom(configuration)
+        }
+        return .builtIn(settings.dictationModel)
+    }
+
+    func importCustomModel(from url: URL) async {
+        do { try await models.importCustomModel(from: url) } catch {
+            showMessage(error.localizedDescription, .danger)
+        }
+    }
+
+    func removeCustomModel() async {
+        do {
+            try await models.removeCustomModel()
+            settings.dictationUsesCustomModel = false
+        } catch { showMessage(error.localizedDescription, .danger) }
+    }
 
     /// A field's own mic: click to start and click to finish, whatever the shortcut's mode or focus.
     func toggle(into editor: any InjectableTextView) {
@@ -137,7 +159,7 @@ final class DictationCoordinator {
     }
 
     private func begin(target: InjectionTarget?) {
-        guard models.isInstalled(settings.dictationModel) else {
+        guard hasModel else {
             field = nil
             showMessage(String(localized: "Download the dictation model in Settings first"), .danger)
             return
@@ -187,7 +209,7 @@ final class DictationCoordinator {
         liveTask = nil
         pendingLive?.cancel()
         let current = token
-        let model = settings.dictationModel
+        let target = currentTarget
         let language = settings.dictationLanguage
         transcriptionTask = Task { [weak self] in
             guard let self else { return }
@@ -209,7 +231,7 @@ final class DictationCoordinator {
             }
             do {
                 let transcript = try await models.transcribe(
-                    tail, model: model,
+                    tail, target: target,
                     language: language)
                 guard token == current else { return }
                 // A mic belongs to its field: the text goes in there, never to the clipboard.
@@ -305,7 +327,7 @@ final class DictationCoordinator {
         let segment = Array(snapshot[overlap..<end])
         do {
             let transcript = try await models.transcribe(
-                segment, model: settings.dictationModel,
+                segment, target: currentTarget,
                 language: settings.dictationLanguage)
             guard token == current else { return }
             liveOffset = end

@@ -359,6 +359,13 @@ final class AppSettings {
         didSet { defaults.set(dictationModel.rawValue, forKey: Key.dictationModel.rawValue) }
     }
 
+    /// Selects the sideloaded Parakeet model in the cache; false keeps the built-in model.
+    var dictationUsesCustomModel: Bool {
+        didSet {
+            defaults.set(dictationUsesCustomModel, forKey: Key.dictationUsesCustomModel.rawValue)
+        }
+    }
+
     /// Nil lets macOS follow the system input device as it changes.
     var dictationMicrophone: String? {
         didSet { defaults.set(dictationMicrophone, forKey: Key.dictationMicrophone.rawValue) }
@@ -766,6 +773,8 @@ final class AppSettings {
         dictationModel =
             defaults.string(forKey: Key.dictationModel.rawValue)
             .flatMap(DictationModel.init) ?? .redux
+        dictationUsesCustomModel =
+            defaults.bool(forKey: Key.dictationUsesCustomModel.rawValue)
         dictationMicrophone = defaults.string(forKey: Key.dictationMicrophone.rawValue)
         dictationDestination =
             defaults.string(forKey: Key.dictationDestination.rawValue)

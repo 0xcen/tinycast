@@ -24,7 +24,7 @@ struct DictationWorkerTest {
         for model in DictationModel.allCases {
             let samples = [Float](repeating: 0.125, count: 16_000)
             let request = DictationWire.Request(
-                id: UUID(), model: model,
+                id: UUID(), target: .builtIn(model),
                 directory: URL(fileURLWithPath: "/tmp/models"), sampleCount: samples.count,
                 language: nil)
             let text = try await worker.transcribe(samples, request: request) { readiness.count += 1 }
@@ -38,7 +38,7 @@ struct DictationWorkerTest {
             let worker = try DictationWorker(executable: executable, arguments: ["--fixture", behavior])
             let samples = [Float](repeating: 0, count: 1_000_000)
             let request = DictationWire.Request(
-                id: UUID(), model: .ultra,
+                id: UUID(), target: .builtIn(.ultra),
                 directory: URL(fileURLWithPath: "/tmp/models"), sampleCount: samples.count,
                 language: nil)
             let ready = AsyncStream<Void>.makeStream()
@@ -72,32 +72,182 @@ struct DictationWorkerTest {
         else {
             fatalError("Installed model metadata is incorrect")
         }
-        let cancelled = Task { try await store.transcribe([0], model: .redux) }
+        let cancelled = Task { try await store.transcribe([0], target: .builtIn(.redux)) }
         cancelled.cancel()
         do {
             _ = try await cancelled.value
             fatalError("Cancelled transcription started")
         } catch is CancellationError {}
-        guard readiness.workers == 0, store.loadedModel == nil, !store.transcribing else {
+        guard readiness.workers == 0, store.loadedTarget == nil, !store.transcribing else {
             fatalError("Cancelled transcription launched a helper")
         }
         for model in [DictationModel.redux, .redux, .ultra] {
-            let text = try await store.transcribe([0], model: model)
-            guard text == model.rawValue, store.loadedModel == model, !store.transcribing else {
+            let text = try await store.transcribe([0], target: .builtIn(model))
+            guard text == model.rawValue, store.loadedTarget == .builtIn(model), !store.transcribing else {
                 fatalError("Model store failed to finish a request")
             }
         }
         guard readiness.workers == 2 else { fatalError("Worker reuse or model-switch cleanup failed") }
         try await store.delete(.ultra)
-        guard store.loadedModel == nil, store.removing == nil, !store.isInstalled(.ultra),
+        guard store.loadedTarget == nil, store.removing == nil, !store.isInstalled(.ultra),
             !FileManager.default.fileExists(
                 atPath: root.appending(path: DictationModel.ultra.folderName).path)
         else {
             fatalError("Model removal retained files or a loaded helper")
         }
+        // Enough files keep the removal in flight long enough for transcribe to observe it.
+        let bulk = root.appending(path: DictationModel.qwenSmall.folderName).appending(path: "bulk")
+        try FileManager.default.createDirectory(at: bulk, withIntermediateDirectories: true)
+        for index in 0..<200 { try Data().write(to: bulk.appending(path: "\(index)")) }
+        let removal = Task { try await store.delete(.qwenSmall) }
+        var removing = false
+        for _ in 0..<1_000 {
+            if store.removing != nil { removing = true; break }
+            await Task.yield()
+        }
+        guard removing else { fatalError("Model removal never started") }
+        do {
+            let text = try await store.transcribe([0], target: .builtIn(.redux))
+            guard text == DictationModel.redux.rawValue else {
+                fatalError("Transcription during another model's removal returned the wrong text")
+            }
+        } catch DictationWire.Failure.busy {
+            fatalError("Removing one model blocked transcribing another")
+        }
+        try await removal.value
+        guard !store.isInstalled(.qwenSmall), store.removing == nil else {
+            fatalError("Model removal did not finish")
+        }
         await store.stop()
         try await testDownload(root: root.appending(path: "downloads"))
+        try await testCustomImport(root: root.appending(path: "custom"), executable: executable)
         print("Dictation worker reuse, switching, removal, cancellation and broken pipes passed")
+    }
+
+    @MainActor
+    private static func testCustomImport(root: URL, executable: URL) async throws {
+        let manager = FileManager.default
+        try manager.createDirectory(at: root, withIntermediateDirectories: true)
+        let importer = DictationCustomModelImporter { directory in
+            let names = Set((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [])
+            let missing = DictationCustomModel.missingFiles(in: names)
+            guard missing.isEmpty, let encoder = DictationCustomModel.encoder(in: names) else {
+                return .failure(.missingFiles, detail: missing.joined(separator: ", "))
+            }
+            guard
+                let data = try? Data(
+                    contentsOf: directory.appending(
+                        path: DictationCustomModel.vocabularyFileName)),
+                let vocabulary = try? DictationCustomModel.vocabulary(from: data)
+            else {
+                return .failure(.invalidVocabulary)
+            }
+            return .success(encoder: encoder, blankToken: vocabulary.blankToken)
+        }
+        let stale = root.appending(path: ".import-\(UUID().uuidString)")
+        try manager.createDirectory(at: stale, withIntermediateDirectories: true)
+        try Data([0]).write(to: stale.appending(path: "weights.bin"))
+        let kept = root.appending(path: ".keep")
+        try manager.createDirectory(at: kept, withIntermediateDirectories: true)
+        let store = DictationModelStore(idleRelease: .never, root: root, importer: importer) {
+            try DictationWorker(executable: executable, arguments: ["--fixture"])
+        }
+        let source = root.appending(path: "bark-3.0-clean")
+        let layout = DictationCustomModel.requiredFiles.union([
+            DictationCustomModel.Encoder.lut3.rawValue
+        ])
+        try manager.createDirectory(at: source, withIntermediateDirectories: true)
+        for name in layout { try Data([0]).write(to: source.appending(path: name)) }
+        try Data(#"{"0":"<unk>","1":"hello","2":"world"}"#.utf8)
+            .write(to: source.appending(path: DictationCustomModel.vocabularyFileName))
+        try await store.importCustomModel(from: source)
+        guard !manager.fileExists(atPath: stale.path), manager.fileExists(atPath: kept.path) else {
+            fatalError("Interrupted import cleanup removed the wrong staging folders")
+        }
+        guard
+            let installation = store.customModel,
+            installation.manifest.originalFolderName == "bark-3.0-clean",
+            installation.encoder == .lut3,
+            store.hasCustomModel,
+            let configuration = store.customConfiguration,
+            configuration.encoder == "Encoder_lut3",
+            configuration.encoderUsesGPU,
+            configuration.blankToken == 3,
+            configuration.stripsNonTextTokens,
+            configuration.joint == DictationCustomModel.jointName
+        else {
+            fatalError("The custom model installation metadata is incorrect")
+        }
+        let published = root.appending(path: DictationCustomModel.directoryName)
+        guard
+            manager.fileExists(
+                atPath: published.appending(path: DictationCustomModel.manifestFileName).path),
+            manager.fileExists(atPath: source.appending(path: "Preprocessor.mlmodelc").path)
+        else {
+            fatalError("Import did not publish a manifest or touched the source")
+        }
+        guard await store.customModelSize() != nil else {
+            fatalError("The custom model size was not reported")
+        }
+        let target = DictationWire.Target.custom(configuration)
+        let text = try await store.transcribe([0], target: target)
+        guard text == "custom", store.loadedTarget == target else {
+            fatalError("A custom model route did not transcribe")
+        }
+        let unsupported = root.appending(path: "unsupported")
+        try manager.createDirectory(at: unsupported, withIntermediateDirectories: true)
+        for name in DictationCustomModel.requiredFiles {
+            try Data([0]).write(to: unsupported.appending(path: name))
+        }
+        do {
+            try await store.importCustomModel(from: unsupported)
+            fatalError("A folder without an encoder was imported")
+        } catch DictationCustomModelError.invalid(let report) {
+            guard report.code == .missingFiles else {
+                fatalError("A missing encoder reported the wrong error")
+            }
+        }
+        let badVocabulary = root.appending(path: "bad-vocabulary")
+        try manager.createDirectory(at: badVocabulary, withIntermediateDirectories: true)
+        for name in layout { try Data([0]).write(to: badVocabulary.appending(path: name)) }
+        try Data(#"{"0":"a","2":"c"}"#.utf8)
+            .write(to: badVocabulary.appending(path: DictationCustomModel.vocabularyFileName))
+        do {
+            try await store.importCustomModel(from: badVocabulary)
+            fatalError("A gapped vocabulary was imported")
+        } catch DictationCustomModelError.invalid(let report) {
+            guard report.code == .invalidVocabulary else {
+                fatalError("An invalid vocabulary reported the wrong error")
+            }
+        }
+        guard
+            store.customModel != nil,
+            try manager.contentsOfDirectory(atPath: root.path).allSatisfy({
+                !$0.hasPrefix(".import")
+            })
+        else {
+            fatalError("A failed import disturbed the installed model or left staging")
+        }
+        try await store.removeCustomModel()
+        guard store.customModel == nil, !manager.fileExists(atPath: published.path) else {
+            fatalError("Custom model removal retained files")
+        }
+        let started = ContinuousClock.now
+        do {
+            _ = try DictationCustomModelImporter.helperReport(
+                for: root, executable: URL(fileURLWithPath: "/bin/sleep"), arguments: ["30"],
+                timeout: .seconds(1))
+            fatalError("A validator that never exits was not timed out")
+        } catch DictationCustomModelError.invalid(let report) {
+            guard report.code == .loadFailed else {
+                fatalError("A validation timeout reported the wrong error")
+            }
+        }
+        let elapsed = ContinuousClock.now - started
+        guard elapsed < .seconds(5) else {
+            fatalError("A validation timeout returned after \(elapsed)")
+        }
+        await store.stop()
     }
 
     private static func testDownload(root: URL) async throws {
@@ -217,7 +367,16 @@ struct DictationWorkerTest {
             try DictationWire.write(
                 DictationWire.Response(
                     id: request.id, status: .result,
-                    text: request.model.rawValue), to: .standardOutput)
+                    text: request.target.fixtureText), to: .standardOutput)
+        }
+    }
+}
+
+extension DictationWire.Target {
+    var fixtureText: String {
+        switch self {
+        case .builtIn(let model): model.rawValue
+        case .custom: "custom"
         }
     }
 }
