@@ -19,6 +19,12 @@ Qwen's tokenizer resources come from Qwen/Qwen3-ASR-0.6B. The Apache 2.0 licence
 - https://huggingface.co/Qwen/Qwen3-ASR-0.6B
 - https://huggingface.co/Qwen/Qwen3-ASR-1.7B
 
+Tinycast does not redistribute Bark or any other sideloaded model. A model the user supplies is
+copied into their own cache and stays under the licence its authors set; that licence is between the
+user and the model's authors, and Tinycast neither ships nor downloads such a model. Bark 3.0 Clean
+is one such model the sideloading path was tested with (`bark-3.0-clean` from FluidInference,
+CC-BY-4.0).
+
 ```
                                  Apache License
                            Version 2.0, January 2004

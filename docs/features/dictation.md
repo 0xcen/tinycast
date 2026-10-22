@@ -101,13 +101,60 @@ compilation of its 2-bit weights; Ultra's encoder and both variants' decoder/joi
   without disabling contextual spaces; if an app does not expose that context through
   Accessibility, the plain transcript is inserted without guessing.
 
+## Custom models (sideloading)
+
+A Parakeet-layout Core ML model you supply yourself can replace a downloaded one. The chosen folder
+must hold `Preprocessor.mlmodelc`, `Decoder.mlmodelc`, `JointDecisionv3.mlmodelc`,
+`parakeet_vocab.json` and one encoder: `Encoder_lut3.mlmodelc` or `Encoder.mlmodelc`. When both
+encoders are present `Encoder_lut3` wins — it is the smaller, GPU-oriented variant, loaded with
+CPU/GPU, while `Encoder.mlmodelc` uses CPU/Neural Engine. Tinycast neither downloads nor ships any
+custom model; the folder is the user's own.
+
+Importing copies the whole folder into this build's dictation cache and validates it there, so the
+original can be moved or deleted afterwards. The copy is staged as `.import-<uuid>`, the embedded
+dictation helper loads every component with Core ML and checks the required files, tensor names and
+shapes and the vocabulary, then the app publishes it as `custom-model/` beside a `custom-model.json`
+manifest recording the source folder's name. The Joint model's `token_id` and `duration` outputs must
+each be `[1, 1, 1]`. Validation runs in the helper, so the main app never imports the Core ML
+adapters; a helper that does not report within 120 seconds is terminated and the import fails. A
+folder with a missing component, a load failure, a mismatched signature or an invalid vocabulary is
+rejected with a localized message and nothing is published.
+
+Attribution files the folder carries — `NOTICE`, `NOTICE.md`, `NOTICE.txt`, `README`, `README.md`,
+`README.txt`, `LICENSE`, `LICENSE.md`, `LICENSE.txt` — are shown in Settings.
+
+A crash can leave an import's `.import-<uuid>` staging folder or an `.import-old-<uuid>` backup
+behind. The next launch removes only dot-directories named with those UUID suffixes, leaving the
+installed model and every other file alone, and a new import waits for that cleanup before staging.
+Settings shows an indeterminate spinner and "Importing…" for the duration, because the copy reports
+no byte progress.
+
+A custom model is decoded with non-text-token filtering: it drops vocabulary token 0 only when its
+piece is `<unk>`, any piece beginning `<|`, and the named specials `<pad>`, `<blank>`, `<s>` and
+`</s>`. The built-in Parakeet Ultra and Redux models keep their previous token handling.
+
+The "Use custom model" toggle selects the imported model for transcription; it is disabled until one
+is installed and while an import or transcription is running. "Remove" deletes Tinycast's copy and
+clears the toggle. The copy lives under the same bundle-ID cache as downloaded models, so macOS may
+purge it; a purged custom model disappears from Settings and must be imported again.
+
+Bark 3.0 Clean is the tested example: the `bark-3.0-clean` conversion from
+[FluidInference/bark-3.0-coreml](https://huggingface.co/FluidInference/bark-3.0-coreml) matches this
+layout, and its source model
+[ConwayResearch/Underdog-Bark-3.0-Clean](https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Clean)
+is CC-BY-4.0.
+
 ## Validation
 
 `dictation-field-test` checks composer switching and teardown, scoped cancellation and delayed insertion
 with synthetic capture and real AppKit editors, without recording audio or touching the shared clipboard.
 `dictation-test` checks formatting and model options; `dictation-inference-test` checks score selection,
 byte BPE, Fourier/mel features, listening bands and audio partitioning without downloading a model. `dictation-worker-test`
-exercises framed IPC, worker reuse/switching, removal, cancellation and broken pipes with a fixture.
+exercises framed IPC, worker reuse/switching, removal, cancellation and broken pipes with a fixture,
+plus interrupted-import cleanup and a validation helper that overruns its deadline.
+`dictation-custom-model-test` checks a custom folder's layout, encoder choice, vocabulary, token
+filtering and tensor signatures, including the Joint outputs' `[1, 1, 1]` shape, without loading
+Core ML.
 An in-process URLProtocol fixture checks byte progress before the first file completes, combined
 progress and atomic installation for both families, including cancellation, stale staging cleanup
 and competing downloads on shared or independent cache roots, without sockets or timed waits.
