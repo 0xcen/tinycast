@@ -537,8 +537,10 @@ Volume slider all render through `DialogController` rather than an `NSAlert`
 `arrow.clockwise`, Empty Trash `trash.slash` — so the dialog is recognizably about the row that
 opened it. Output volume and mute actions also show Tinycast's transient volume HUD, since macOS only draws
 its own for real media keys. Volume Up/Down walk a 5% grid (`VolumeLevel.stepped`, covered by
-`Tests/volume-test.swift`): an off-grid level snaps to the next line rather than past it, so from 37%
-up lands on 40% and down on 35%, and repeated presses stay on round numbers.
+`Tests/volume-test.swift`): each press moves one line from the level's nearest line, so from 37% up
+lands on 40% and down on 30%, and repeated presses stay on round numbers. Stepping from the nearest
+line matters for devices that store a level slightly off the one set (45.1% for 45%): stepping from
+the read-back level alone would aim at the same line again and never move.
 
 An action whose effect is invisible reports back through a pill (`MessageHUDController`, the same one
 Custom Commands and Snippets confirm through) rather than finishing silently:
