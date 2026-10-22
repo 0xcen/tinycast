@@ -139,6 +139,7 @@ targets:
     sources:
       - Tinycast/Features/Dictation/Helper
       - Tinycast/Features/Dictation/Model/DictationModel.swift
+      - Tinycast/Features/Dictation/Model/DictationCustomModel.swift
       - Tinycast/Features/Dictation/Model/DictationAudioChunks.swift
       - Tinycast/Features/Dictation/Model/DictationLanguage.swift
       - Tinycast/Features/Dictation/Service/DictationWire.swift

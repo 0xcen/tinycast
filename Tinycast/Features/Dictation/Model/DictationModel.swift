@@ -1,10 +1,12 @@
 import Foundation
 
 enum DictationModel: String, CaseIterable, Identifiable, Codable, Sendable {
-    struct ParakeetConfiguration: Sendable {
+    struct ParakeetConfiguration: Codable, Equatable, Sendable {
+        let encoder: String
         let joint: String
         let blankToken: Int
         let encoderUsesGPU: Bool
+        let stripsNonTextTokens: Bool
     }
     enum Family: String, CaseIterable, Identifiable {
         case parakeet = "Parakeet", qwen = "Qwen"
@@ -50,7 +52,9 @@ enum DictationModel: String, CaseIterable, Identifiable, Codable, Sendable {
     var parakeetConfiguration: ParakeetConfiguration? {
         switch self {
         case .ultra, .redux:
-            .init(joint: "JointDecisionv3", blankToken: 8192, encoderUsesGPU: self == .redux)
+            .init(
+                encoder: "Encoder", joint: "JointDecisionv3", blankToken: 8192,
+                encoderUsesGPU: self == .redux, stripsNonTextTokens: false)
         case .qwenSmall, .qwenLarge: nil
         }
     }
@@ -74,7 +78,7 @@ enum DictationModel: String, CaseIterable, Identifiable, Codable, Sendable {
         if isQwen { return ["encoder.mlmodelc", "decoder.mlmodelc", "embedding.mlmodelc", "config.json"] }
         guard let configuration = parakeetConfiguration else { return [] }
         return [
-            "Preprocessor.mlmodelc", "Encoder.mlmodelc", "Decoder.mlmodelc",
+            "Preprocessor.mlmodelc", configuration.encoder + ".mlmodelc", "Decoder.mlmodelc",
             configuration.joint + ".mlmodelc", "parakeet_vocab.json"
         ]
     }

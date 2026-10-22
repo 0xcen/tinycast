@@ -93,6 +93,9 @@ struct DictationTest {
                 else {
                     fatalError("Parakeet download and inference disagree")
                 }
+                guard configuration.stripsNonTextTokens == false else {
+                    fatalError("A shipped Parakeet model must keep the legacy token behavior")
+                }
             } else if !model.isQwen {
                 fatalError("Missing Parakeet decoding configuration")
             }
