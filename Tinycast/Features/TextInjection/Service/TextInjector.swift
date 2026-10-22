@@ -50,19 +50,22 @@ enum TextReplacementPolicy {
         return .matched(NSRange(start..<beforeCursor.endIndex, in: value))
     }
 
-    /// Chromium answers `.success` and applies nothing, so the value has to read back as we wrote it.
-    static func confirmsReplacement(
+    /// Chromium applies nothing on `.success` and Telegram applies late; only a readback counts.
+    static func outcomeAfterWrite(
         originalValue: String,
         replacementRange: NSRange,
         insertedText: String,
-        observedValue: String?
-    ) -> Bool {
-        guard let observedValue,
-            let stringRange = Range(replacementRange, in: originalValue)
-        else { return false }
-        var expected = originalValue
-        expected.replaceSubrange(stringRange, with: insertedText)
-        return observedValue == expected
+        readbacks: [String?]
+    ) -> AccessibilityReplacement {
+        let expected = Range(replacementRange, in: originalValue).map {
+            originalValue.replacingCharacters(in: $0, with: insertedText)
+        }
+        for readback in readbacks {
+            guard let readback else { return .rejected }
+            if readback == expected { return .delivered }
+            if readback != originalValue { return .rejected }
+        }
+        return .unavailable
     }
 }
 
@@ -674,24 +677,37 @@ final class TextInjector {
             return .unavailable
         }
 
-        let observed = stringValue(in: target.element)
-        guard
-            TextReplacementPolicy.confirmsReplacement(
+        var readbacks: [String?] = []
+        for attempt in 0..<Self.writeConfirmationAttempts {
+            readbacks.append(stringValue(in: target.element))
+            let outcome = TextReplacementPolicy.outcomeAfterWrite(
                 originalValue: target.value,
                 replacementRange: target.replacementRange,
                 insertedText: injected.text,
-                observedValue: observed)
-        else {
-            _ = setSelectedRange(target.originalRange, in: target.element)
-            // An untouched value is a tier that did nothing; anything else moved text we cannot name.
-            return observed == target.value ? .unavailable : .rejected
+                readbacks: readbacks)
+            if outcome == .delivered {
+                _ = setSelectedRange(
+                    NSRange(
+                        location: target.replacementRange.location + injected.caretPrefixLength,
+                        length: 0),
+                    in: target.element)
+                return .delivered
+            }
+            guard outcome == .unavailable, attempt < Self.writeConfirmationAttempts - 1 else {
+                _ = setSelectedRange(target.originalRange, in: target.element)
+                return outcome
+            }
+            guard
+                deliveryIsAllowed(
+                    automaticGeneration: automaticGeneration, targetApp: targetApp,
+                    promptForInteractiveAccessibility: false),
+                await wait(for: Self.writeConfirmationInterval)
+            else {
+                _ = setSelectedRange(target.originalRange, in: target.element)
+                return .rejected
+            }
         }
-
-        _ = setSelectedRange(
-            NSRange(
-                location: target.replacementRange.location + injected.caretPrefixLength, length: 0),
-            in: target.element)
-        return .delivered
+        return .unavailable
     }
 
     /// Rule 2: a renderer applies the keystroke before it says so, so a short lag is not a mismatch.
@@ -770,6 +786,10 @@ final class TextInjector {
     /// A renderer, or AppKit handing us our own keystroke, converges in single-digit milliseconds.
     private static let convergenceAttempts = 8
     private static let convergenceInterval = Duration.milliseconds(5)
+
+    /// Telegram reflects an Accessibility write late, past the convergence budget.
+    private static let writeConfirmationAttempts = 30
+    private static let writeConfirmationInterval = Duration.milliseconds(5)
 
     private func waitForPasteConfirmation(
         previousState: AccessibilityTextState?,
