@@ -106,6 +106,7 @@ enum AppSettingsKey: String, CaseIterable {
     case dictationEnabled = "dictationEnabled"
     case dictationMode = "dictationMode"
     case dictationModel = "dictationModel"
+    case dictationUsesCustomModel = "dictationUsesCustomModel"
     case dictationMicrophone = "dictationMicrophone"
     case dictationDestination = "dictationDestination"
     case dictationAdaptsCapitalization = "dictationAdaptsCapitalization"

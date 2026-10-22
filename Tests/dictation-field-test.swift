@@ -310,6 +310,7 @@ final class AppSettings {
     var dictationEnabled = true
     var dictationMode = DictationMode.toggle
     var dictationModel = DictationModel.redux
+    var dictationUsesCustomModel = false
     var dictationMicrophone: String?
     var dictationLanguage: String?
     var dictationDestination = DictationDestination.copy
@@ -352,14 +353,20 @@ final class DictationCapture {
 final class DictationModelStore {
     var pending: CheckedContinuation<String, any Error>?
     var finished = false
+    var hasCustomModel = false
+    var customConfiguration: DictationModel.ParakeetConfiguration?
 
     func isInstalled(_ model: DictationModel) -> Bool { true }
     func download(_ model: DictationModel) async throws {}
     func delete(_ model: DictationModel) async throws {}
+    func importCustomModel(from url: URL) async throws {}
+    func removeCustomModel() async throws {}
     func stop() async {}
     func prepareForTermination() {}
 
-    func transcribe(_ samples: [Float], model: DictationModel, language: String?) async throws -> String {
+    func transcribe(
+        _ samples: [Float], target: DictationWire.Target, language: String?
+    ) async throws -> String {
         defer { finished = true }
         return try await withCheckedThrowingContinuation { pending = $0 }
     }

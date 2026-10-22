@@ -22,22 +22,24 @@ struct DictationBenchmark {
         }
         let root = URL(fileURLWithPath: CommandLine.arguments[3])
         let selection = CommandLine.arguments[4]
-        let models =
-            selection == "all" ? DictationModel.allCases : DictationModel(rawValue: selection).map { [$0] }
-        guard let models else { throw CocoaError(.coderInvalidValue) }
+        let cases = try benchmarkCases(selection: selection, root: root)
         print("Cold means a fresh helper; macOS's file and Core ML caches are left untouched.")
         print("| Model | Run | Load | Transcribe | Sampled peak |")
         print("| --- | --- | --- | --- | --- |")
         var transcripts = [String]()
-        for model in models {
-            let directory = root.appending(path: model.folderName)
-            guard
-                model.requiredFiles.allSatisfy({
+        for item in cases {
+            let directory = item.directory
+            let names = Set((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [])
+            let installed: Bool
+            switch item.target {
+            case .builtIn(let model):
+                installed = model.requiredFiles.allSatisfy {
                     FileManager.default.fileExists(atPath: directory.appending(path: $0).path)
-                })
-            else {
-                throw DictationWire.Failure.notInstalled
+                }
+            case .custom:
+                installed = DictationCustomModel.missingFiles(in: names).isEmpty
             }
+            guard installed else { throw DictationWire.Failure.notInstalled }
             let process = Process()
             let input = Pipe(), output = Pipe()
             process.executableURL = bundle.appending(path: "Contents/MacOS/\(name)")
@@ -70,7 +72,7 @@ struct DictationBenchmark {
                 defer { monitor.cancel() }
                 let started = ContinuousClock.now
                 let request = DictationWire.Request(
-                    id: UUID(), model: model, directory: directory,
+                    id: UUID(), target: item.target, directory: directory,
                     sampleCount: samples.count, language: nil)
                 try DictationWire.write(request, to: input.fileHandleForWriting)
                 guard
@@ -89,12 +91,45 @@ struct DictationBenchmark {
                 monitor.cancel()
                 let peak = await monitor.value.map { "\($0 / 1_000_000) MB" } ?? "Unavailable"
                 print(
-                    "| \(model.title) | \(run) | \(seconds(started.duration(to: loaded))) s | "
+                    "| \(item.title) | \(run) | \(seconds(started.duration(to: loaded))) s | "
                         + "\(seconds(loaded.duration(to: finished))) s | \(peak) |")
-                transcripts.append("Transcript (\(model.rawValue), \(run)): \(result.text)")
+                transcripts.append("Transcript (\(item.label), \(run)): \(result.text)")
             }
         }
         for text in transcripts { print(text) }
+    }
+
+    private struct BenchmarkCase {
+        let title: String
+        let label: String
+        let directory: URL
+        let target: DictationWire.Target
+    }
+
+    private static func benchmarkCases(selection: String, root: URL) throws -> [BenchmarkCase] {
+        if selection == "custom" {
+            let names = Set((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? [])
+            guard DictationCustomModel.missingFiles(in: names).isEmpty,
+                let encoder = DictationCustomModel.encoder(in: names),
+                let data = try? Data(
+                    contentsOf: root.appending(path: DictationCustomModel.vocabularyFileName)),
+                let configuration = try? DictationCustomModel.configuration(
+                    encoder: encoder, vocabularyData: data)
+            else { throw DictationWire.Failure.notInstalled }
+            return [
+                BenchmarkCase(
+                    title: "Custom", label: "custom", directory: root,
+                    target: .custom(configuration))
+            ]
+        }
+        let models =
+            selection == "all" ? DictationModel.allCases : DictationModel(rawValue: selection).map { [$0] }
+        guard let models else { throw CocoaError(.coderInvalidValue) }
+        return models.map {
+            BenchmarkCase(
+                title: $0.title, label: $0.rawValue, directory: root.appending(path: $0.folderName),
+                target: .builtIn($0))
+        }
     }
 
     private static func audio(at url: URL) throws -> [Float] {

@@ -98,6 +98,7 @@ enum SettingsFileSchema {
         case .dictationShortcut:
             return shortcuts.binding(for: key, action: .dictation, name: String(localized: "Dictation"))
         case .dictationModel: return bind(settings, \.dictationModel)
+        case .dictationUsesCustomModel: return bind(settings, \.dictationUsesCustomModel)
         case .dictationMicrophone: return bind(settings, \.dictationMicrophone)
         case .dictationDestination: return bind(settings, \.dictationDestination)
         case .dictationAdaptsCapitalization: return bind(settings, \.dictationAdaptsCapitalization)
