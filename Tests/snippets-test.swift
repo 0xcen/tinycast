@@ -853,32 +853,102 @@ struct SnippetsTests {
                 keyword: "!tcaxprobe") == .rejected)
         check(
             "AX replacement confirmation requires the observable text to actually change",
-            TextReplacementPolicy.confirmsReplacement(
+            TextReplacementPolicy.outcomeAfterWrite(
                 originalValue: "!tcprobe",
                 replacementRange: NSRange(location: 0, length: 8),
                 insertedText: "PROBE_OK",
-                observedValue: "PROBE_OK"))
+                readbacks: ["PROBE_OK"]) == .delivered)
         check(
             "an AX setter success with unchanged text is not accepted as delivery",
-            !TextReplacementPolicy.confirmsReplacement(
+            TextReplacementPolicy.outcomeAfterWrite(
                 originalValue: "!tcprobe",
                 replacementRange: NSRange(location: 0, length: 8),
                 insertedText: "PROBE_OK",
-                observedValue: "!tcprobe"))
+                readbacks: ["!tcprobe"]) == .unavailable)
         check(
             "an AX write that lands somewhere unexpected is not accepted as delivery",
-            !TextReplacementPolicy.confirmsReplacement(
+            TextReplacementPolicy.outcomeAfterWrite(
                 originalValue: "keep !tcprobe",
                 replacementRange: NSRange(location: 5, length: 8),
                 insertedText: "PROBE_OK",
-                observedValue: "PROBE_OK !tcprobe"))
+                readbacks: ["PROBE_OK !tcprobe"]) == .rejected)
         check(
             "an unreadable value after the write is not accepted as delivery",
-            !TextReplacementPolicy.confirmsReplacement(
+            TextReplacementPolicy.outcomeAfterWrite(
                 originalValue: "!tcprobe",
                 replacementRange: NSRange(location: 0, length: 8),
                 insertedText: "PROBE_OK",
-                observedValue: nil))
+                readbacks: [nil]) == .rejected)
+        check(
+            "a value that reflects the write on a later read is delivered",
+            TextReplacementPolicy.outcomeAfterWrite(
+                originalValue: "",
+                replacementRange: NSRange(location: 0, length: 0),
+                insertedText: "text",
+                readbacks: ["", "text"]) == .delivered)
+        check(
+            "an empty editor that never moves is unavailable rather than delivered",
+            TextReplacementPolicy.outcomeAfterWrite(
+                originalValue: "",
+                replacementRange: NSRange(location: 0, length: 0),
+                insertedText: "text",
+                readbacks: ["", "", ""]) == .unavailable)
+        check(
+            "an empty editor that changes into unexpected text is rejected",
+            TextReplacementPolicy.outcomeAfterWrite(
+                originalValue: "",
+                replacementRange: NSRange(location: 0, length: 0),
+                insertedText: "text",
+                readbacks: ["", "garbage"]) == .rejected)
+        check(
+            "an unchanged value that already contains the insert is not delivered",
+            TextReplacementPolicy.outcomeAfterWrite(
+                originalValue: "ok ",
+                replacementRange: NSRange(location: 3, length: 0),
+                insertedText: "ok",
+                readbacks: ["ok "]) == .unavailable)
+        check(
+            "a later read that matches the expected string is delivered",
+            TextReplacementPolicy.outcomeAfterWrite(
+                originalValue: "ok ",
+                replacementRange: NSRange(location: 3, length: 0),
+                insertedText: "ok",
+                readbacks: ["ok ", "ok ok"]) == .delivered)
+        check(
+            "an unexplained change on an early read is final, even if a later read matches",
+            TextReplacementPolicy.outcomeAfterWrite(
+                originalValue: "!tcprobe",
+                replacementRange: NSRange(location: 0, length: 8),
+                insertedText: "PROBE_OK",
+                readbacks: ["garbage", "PROBE_OK"]) == .rejected)
+        check(
+            "a write that becomes unreadable after an unchanged read is rejected",
+            TextReplacementPolicy.outcomeAfterWrite(
+                originalValue: "!tcprobe",
+                replacementRange: NSRange(location: 0, length: 8),
+                insertedText: "PROBE_OK",
+                readbacks: ["!tcprobe", nil]) == .rejected)
+        check(
+            "deleting the keyword into an empty value reads back as delivered",
+            TextReplacementPolicy.outcomeAfterWrite(
+                originalValue: "!tcprobe",
+                replacementRange: NSRange(location: 0, length: 8),
+                insertedText: "",
+                readbacks: ["!tcprobe", ""]) == .delivered)
+        check(
+            "a replacement range outside the value keeps the unchanged value unavailable",
+            TextReplacementPolicy.outcomeAfterWrite(
+                originalValue: "abc",
+                replacementRange: NSRange(location: 10, length: 1),
+                insertedText: "x",
+                readbacks: ["abc"]) == .unavailable)
+        check(
+            "a write reflected only after many unchanged reads is still delivered",
+            TextReplacementPolicy.outcomeAfterWrite(
+                originalValue: "",
+                replacementRange: NSRange(location: 0, length: 0),
+                insertedText: "text",
+                readbacks: Array(repeating: "", count: 29) + ["text"]) == .delivered)
 
         check(
             "a Unicode keystroke never carries more than Blink's four-unit cap",
