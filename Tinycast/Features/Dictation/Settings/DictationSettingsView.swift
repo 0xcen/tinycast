@@ -10,6 +10,7 @@ struct DictationSettingsView: View {
     @State private var microphoneAccess = Permissions.microphoneAccess()
     var body: some View {
         @Bindable var settings = settings
+        let usesCustom = settings.dictationUsesCustomModel && coordinator.models.hasCustomModel
         return Form {
             Section {
                 Toggle(isOn: enabledBinding) {
@@ -89,6 +90,7 @@ struct DictationSettingsView: View {
                         Text(
                             settings.dictationModel.family.summary + " · " + settings.dictationModel.coverage)
                     }
+                    .settingsEnabled(!usesCustom)
                     Picker(selection: $settings.dictationModel) {
                         ForEach(
                             DictationModel.allCases.filter { $0.family == settings.dictationModel.family }
@@ -99,6 +101,7 @@ struct DictationSettingsView: View {
                         SettingsRowTitle(.dictationModel, "Model")
                         Text(settings.dictationModel.summary)
                     }
+                    .settingsEnabled(!usesCustom)
 
                     let installed = coordinator.models.isInstalled(settings.dictationModel)
                     let downloading = coordinator.models.downloading == settings.dictationModel
@@ -124,6 +127,7 @@ struct DictationSettingsView: View {
                                     : "Not installed")
                             Text(modelDescription)
                         }
+                        .settingsEnabled(!usesCustom)
                     }
                     if settings.dictationModel.isQwen, installed {
                         Picker(selection: languageBinding) {
@@ -137,6 +141,7 @@ struct DictationSettingsView: View {
                             SettingsRowTitle(.dictationModel, "Language")
                         }
                     }
+                    CustomModelSettingsRows()
                 } header: {
                     SettingsSectionHeader(.dictationModel)
                 }
@@ -312,5 +317,124 @@ struct DictationSettingsView: View {
             await coordinator.removeModel(model)
             await refreshModelSize(model)
         }
+    }
+}
+
+private struct CustomModelSettingsRows: View {
+    @Environment(DictationCoordinator.self) private var coordinator
+    @Environment(AppSettings.self) private var settings
+    @State private var size: Int64?
+    @State private var attribution: [AttributionFile] = []
+    @State private var showsAttribution = false
+
+    var body: some View {
+        @Bindable var settings = settings
+        let models = coordinator.models
+        Group {
+            LabeledContent {
+                if models.importing {
+                    ProgressView("Importing…")
+                        .controlSize(.small)
+                } else {
+                    if models.hasCustomModel {
+                        Button("Remove") { remove() }
+                            .settingsEnabled(!models.importing && !models.transcribing)
+                    }
+                    Button("Import…") { importModel() }
+                        .settingsEnabled(!models.importing && !models.transcribing)
+                }
+            } label: {
+                SettingsRowTitle(.dictationModel, "Custom model")
+                Text(status)
+            }
+            Toggle(isOn: $settings.dictationUsesCustomModel) {
+                SettingsRowTitle(.dictationModel, "Use custom model")
+            }
+            .settingsEnabled(models.hasCustomModel && !models.importing && !models.transcribing)
+            if !attribution.isEmpty {
+                DisclosureGroup(isExpanded: $showsAttribution) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                            ForEach(attribution) { file in
+                                Text(file.name)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                Text(file.text)
+                                    .font(.caption.monospaced())
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .padding(.vertical, Theme.Spacing.xs)
+                    }
+                    .frame(maxHeight: Self.attributionMaxHeight)
+                } label: {
+                    Text("Licenses and notices")
+                }
+            }
+        }
+        .task { await reload() }
+        .onChange(of: coordinator.models.hasCustomModel) { _, installed in
+            if installed {
+                Task { await reload() }
+            } else {
+                size = nil
+                attribution = []
+                showsAttribution = false
+            }
+        }
+    }
+
+    private static let attributionMaxHeight: CGFloat = 200
+
+    private struct AttributionFile: Identifiable, Sendable {
+        let name: String
+        let text: String
+        var id: String { name }
+    }
+
+    private var status: String {
+        guard let installation = coordinator.models.customModel else {
+            return String(localized: "No custom model installed")
+        }
+        let name = installation.manifest.originalFolderName
+        guard let size else { return name }
+        return name + " · "
+            + String(
+                localized: "\(ByteCountFormatter.string(fromByteCount: size, countStyle: .file)) on disk")
+    }
+
+    private func importModel() {
+        guard
+            let url = FolderPicker.choose(
+                message: String(localized: "Choose a folder containing a Parakeet Core ML model."),
+                startingAt: FileManager.default.homeDirectoryForCurrentUser)
+        else { return }
+        Task { await coordinator.importCustomModel(from: url) }
+    }
+
+    private func remove() {
+        Task { await coordinator.removeCustomModel() }
+    }
+
+    private func reload() async {
+        let models = coordinator.models
+        guard models.hasCustomModel else {
+            size = nil
+            attribution = []
+            return
+        }
+        size = await models.customModelSize()
+        let directory = models.customModelDirectory
+        let names = DictationCustomModel.attributionFiles
+        attribution = await Task.detached(priority: .utility) {
+            names.compactMap { name in
+                guard
+                    let text = try? String(
+                        contentsOf: directory.appending(path: name), encoding: .utf8)
+                else { return nil }
+                return AttributionFile(name: name, text: text)
+            }
+        }.value
     }
 }
