@@ -320,8 +320,8 @@ where every clause is a rule in it.
 
 1. The focused element exposes `AXSelectedTextMarkerRange` → a renderer surface. Skip Accessibility.
 2. The keyword is not at the caret yet → wait, up to 40 ms. Never arrives → events. Wrong → refuse.
-3. Write over Accessibility, read the value back. Matches → done. Unchanged → events. Moved some
-   other way → refuse.
+3. Write over Accessibility, re-read the value for up to ~150 ms. Matches → done. Unchanged →
+   events. Moved some other way → refuse.
 4. Events: delete the keyword, then paste (long or multiline) or type in four-unit keystrokes.
 5. Nothing landed → say so.
 
@@ -339,11 +339,14 @@ keyword, which is a genuine mismatch and stops delivery. Only an automatic expan
 interactive one has no keyword race to lose. The convergence window is why an empty Monaco snapshot
 falls through to events instead of reading as a mismatch.
 
-**Rule 3: a `kAXErrorSuccess` from the setter is not evidence.** Chromium answers success and applies
-nothing. `confirmsReplacement` rebuilds the exact string the write should have produced and compares
-it to what the element reports. An unchanged value is `.unavailable`, so the event tiers still get
-their turn instead of an "applied" message over untouched text; a value that changed into something
-we did not write is `.rejected`, because events would then edit a document we can no longer describe.
+**Rule 3: the setter's answer is not evidence, success or error.** Chromium answers `kAXErrorSuccess`
+and applies nothing; Telegram answers `kAXErrorFailure` and applies the text. `outcomeAfterWrite`
+rebuilds the exact string the write should have produced and compares it to what the element reports,
+re-reading the value for up to ~150 ms (30 reads, 5 ms apart) no matter what the setter returned. A
+value unchanged across the whole window is `.unavailable`, so the event tiers still get their turn
+instead of an "applied" message over untouched text; a value that changed into something we did not
+write, or that cannot be read, is `.rejected`, because events would then edit a document we can no
+longer describe.
 
 **Rule 4** keeps the same permission, consent, Secure Event Input, target-app and cancellation gates.
 The fallback deletes the keyword first, waits for deletion to settle, then inserts the expansion.
@@ -423,10 +426,11 @@ main-actor watcher against temporary roots:
 ./Scripts/run-tests.sh snippets-test
 ```
 
-The delivery contract's two judgements — `keywordState` and `confirmsReplacement` — are pure, so the
-harness drives renderer lag, a genuine mismatch, an empty editor snapshot, a false-success setter and
-a write that landed elsewhere without an editor in the room. The tiers themselves are not: which rule
-a given app takes is a manual check.
+The delivery contract's two judgements — `keywordState` and `outcomeAfterWrite` — are pure, so the
+harness drives renderer lag, a genuine mismatch, an empty editor snapshot, a false-success setter, a
+setter that errors after applying the text, a write that reads back late and one that landed elsewhere
+without an editor in the room. The tiers
+themselves are not: which rule a given app takes is a manual check.
 
 ### Manual sweep
 
