@@ -105,12 +105,14 @@ compilation of its 2-bit weights; Ultra's encoder and both variants' decoder/joi
 
 A Parakeet-layout Core ML model you supply yourself can replace a downloaded one. The chosen folder
 must hold `Preprocessor.mlmodelc`, `Decoder.mlmodelc`, `JointDecisionv3.mlmodelc`,
-`parakeet_vocab.json` and one encoder: `Encoder_lut3.mlmodelc` or `Encoder.mlmodelc`. When both
-encoders are present `Encoder_lut3` wins — it is the smaller, GPU-oriented variant, loaded with
-CPU/GPU, while `Encoder.mlmodelc` uses CPU/Neural Engine. Tinycast neither downloads nor ships any
-custom model; the folder is the user's own, and any licence it carries is the user's concern.
+`parakeet_vocab.json` and one encoder: `Encoder.mlmodelc` or `Encoder_lut3.mlmodelc`. When both
+encoders are present `Encoder.mlmodelc` wins — it runs on the Neural Engine and keeps markedly less
+memory resident, while `Encoder_lut3.mlmodelc` is the GPU-oriented variant, used when it is the only
+encoder present. Tinycast neither downloads nor ships any custom model; the folder is the user's own,
+and any licence it carries is the user's concern.
 
-Importing copies the whole folder into this build's dictation cache and validates it there, so the
+Importing copies only the winning encoder package, `Preprocessor`, `Decoder`, `JointDecisionv3`, the
+vocabulary and any `NOTICE` into this build's dictation cache and validates it there, so the
 original can be moved or deleted afterwards. The copy is staged as `.import-<uuid>`, the embedded
 dictation helper loads every component with Core ML and checks the required files, tensor names and
 shapes and the vocabulary, then the app publishes it as `custom-model/` beside a `custom-model.json`
@@ -136,6 +138,10 @@ the imported model then appears in the dropdown under its source folder's name, 
 shows the folder's name and size with a "Remove" button that deletes Tinycast's copy. The copy lives
 under the same bundle-ID cache as downloaded models, so macOS may purge it; a purged custom model
 disappears from the dropdown and the selection falls back to the built-in model.
+
+On a Mac with limited unified memory, leave Release after idle at its one-minute default: the GPU
+`Encoder_lut3` keeps far more memory resident than the ANE `Encoder`, and the idle store reaps the
+helper so that memory returns to the app alone.
 
 ## Validation
 
