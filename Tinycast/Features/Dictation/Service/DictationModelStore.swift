@@ -49,9 +49,6 @@ final class DictationModelStore {
 
     var hasCustomModel: Bool { customConfiguration != nil }
 
-    /// The custom model's own folder, so the settings surface can read its attribution files.
-    var customModelDirectory: URL { customDirectory }
-
     /// Parsed on first use: an import commonly leaves no need for it until a transcription starts.
     var customConfiguration: DictationModel.ParakeetConfiguration? {
         guard let customModel else { return nil }

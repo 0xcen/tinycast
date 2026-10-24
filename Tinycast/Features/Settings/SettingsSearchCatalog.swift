@@ -342,7 +342,6 @@ enum SettingsSearchCatalog {
         .init(.dictationModel, "Model"),
         .init(.dictationModel, "Engine", keywords: ["parakeet", "redux", "ultra", "qwen"]),
         .init(.dictationModel, "Language"),
-        .init(.dictationModel, "Custom model", keywords: ["import", "sideload", "own model", "folder"]),
         .init(.dictationMemory, "Release model from memory"),
         .init(.dictationOutput, "Microphone"),
         .init(.dictationOutput, "When finished"),

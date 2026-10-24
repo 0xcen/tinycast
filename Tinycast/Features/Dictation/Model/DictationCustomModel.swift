@@ -11,11 +11,6 @@ enum DictationCustomModel {
         "Preprocessor.mlmodelc", "Decoder.mlmodelc", "JointDecisionv3.mlmodelc", vocabularyFileName,
     ]
 
-    static let attributionFiles = [
-        "NOTICE", "NOTICE.md", "NOTICE.txt", "README", "README.md", "README.txt", "LICENSE",
-        "LICENSE.md", "LICENSE.txt",
-    ]
-
     enum ComputeUnits: Sendable {
         case cpuAndGPU
         case cpuAndNeuralEngine

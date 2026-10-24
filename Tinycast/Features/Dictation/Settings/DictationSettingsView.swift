@@ -7,10 +7,17 @@ struct DictationSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @State private var microphones: [AVCaptureDevice] = []
     @State private var modelSize: Int64?
+    @State private var customSize: Int64?
     @State private var microphoneAccess = Permissions.microphoneAccess()
+
+    /// The Model picker's own value: a built-in variant, the installed custom model, or the action row.
+    private enum ModelSelection: Hashable {
+        case builtIn(DictationModel)
+        case custom
+        case chooseCustom
+    }
     var body: some View {
         @Bindable var settings = settings
-        let usesCustom = settings.dictationUsesCustomModel && coordinator.models.hasCustomModel
         return Form {
             Section {
                 Toggle(isOn: enabledBinding) {
@@ -88,24 +95,51 @@ struct DictationSettingsView: View {
                     } label: {
                         SettingsRowTitle(.dictationModel, "Engine")
                         Text(
-                            settings.dictationModel.family.summary + " · " + settings.dictationModel.coverage)
+                            customSelected
+                                ? customModelName
+                                : settings.dictationModel.family.summary + " · "
+                                    + settings.dictationModel.coverage)
                     }
-                    .settingsEnabled(!usesCustom)
-                    Picker(selection: $settings.dictationModel) {
+                    .settingsEnabled(!coordinator.models.importing)
+                    Picker(selection: modelBinding) {
                         ForEach(
                             DictationModel.allCases.filter { $0.family == settings.dictationModel.family }
                         ) { model in
-                            Text(model.variantTitle).tag(model)
+                            Text(model.variantTitle).tag(ModelSelection.builtIn(model))
+                        }
+                        if settings.dictationModel.family == .parakeet {
+                            if coordinator.models.hasCustomModel {
+                                Divider()
+                                Text(customModelName).tag(ModelSelection.custom)
+                            }
+                            Text("Custom…").tag(ModelSelection.chooseCustom)
                         }
                     } label: {
                         SettingsRowTitle(.dictationModel, "Model")
-                        Text(settings.dictationModel.summary)
+                        Text(customSelected ? customModelDescription : settings.dictationModel.summary)
                     }
-                    .settingsEnabled(!usesCustom)
+                    .settingsEnabled(!coordinator.models.importing)
 
                     let installed = coordinator.models.isInstalled(settings.dictationModel)
                     let downloading = coordinator.models.downloading == settings.dictationModel
-                    if downloading {
+                    if coordinator.models.importing {
+                        LabeledContent {
+                            ProgressView("Importing…")
+                                .controlSize(.small)
+                        } label: {
+                            Text(customModelName)
+                        }
+                    } else if customSelected {
+                        LabeledContent {
+                            Button("Remove") { removeCustomModel() }
+                                .disabled(coordinator.models.transcribing)
+                        } label: {
+                            Text(
+                                LocalizedStringResource(
+                                    "dictation-model-installed", defaultValue: "Installed"))
+                            Text(customModelDescription)
+                        }
+                    } else if downloading {
                         DownloadProgressView(models: coordinator.models)
                     } else {
                         LabeledContent {
@@ -127,7 +161,6 @@ struct DictationSettingsView: View {
                                     : "Not installed")
                             Text(modelDescription)
                         }
-                        .settingsEnabled(!usesCustom)
                     }
                     if settings.dictationModel.isQwen, installed {
                         Picker(selection: languageBinding) {
@@ -141,7 +174,6 @@ struct DictationSettingsView: View {
                             SettingsRowTitle(.dictationModel, "Language")
                         }
                     }
-                    CustomModelSettingsRows()
                 } header: {
                     SettingsSectionHeader(.dictationModel)
                 }
@@ -219,6 +251,9 @@ struct DictationSettingsView: View {
             coordinator.models.refreshInstalledModels()
             await refreshModelSize(settings.dictationModel)
         }
+        .task(id: "\(coordinator.models.hasCustomModel)-\(coordinator.models.importing)") {
+            customSize = await coordinator.models.customModelSize()
+        }
     }
 
     private var enabledBinding: Binding<Bool> {
@@ -237,7 +272,24 @@ struct DictationSettingsView: View {
         Binding(
             get: { settings.dictationModel.family },
             set: {
+                settings.dictationUsesCustomModel = false
                 settings.dictationModel = $0 == .parakeet ? .redux : .qwenSmall
+            })
+    }
+
+    private var modelBinding: Binding<ModelSelection> {
+        Binding(
+            get: { customSelected ? .custom : .builtIn(settings.dictationModel) },
+            set: { selection in
+                switch selection {
+                case .builtIn(let model):
+                    settings.dictationUsesCustomModel = false
+                    settings.dictationModel = model
+                case .custom:
+                    settings.dictationUsesCustomModel = true
+                case .chooseCustom:
+                    chooseCustomModel()
+                }
             })
     }
 
@@ -254,6 +306,20 @@ struct DictationSettingsView: View {
         return modelSize.map {
             String(localized: "\(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)) on disk")
         } ?? String(localized: "About \(approximate.formatted(.byteCount(style: .file))) on disk")
+    }
+
+    private var customSelected: Bool {
+        settings.dictationUsesCustomModel && coordinator.models.hasCustomModel
+    }
+
+    private var customModelName: String {
+        coordinator.models.customModel?.manifest.originalFolderName ?? String(localized: "Custom…")
+    }
+
+    private var customModelDescription: String {
+        guard let customSize else { return customModelName }
+        return String(
+            localized: "\(ByteCountFormatter.string(fromByteCount: customSize, countStyle: .file)) on disk")
     }
 
     private struct DownloadProgressView: View {
@@ -318,123 +384,20 @@ struct DictationSettingsView: View {
             await refreshModelSize(model)
         }
     }
-}
 
-private struct CustomModelSettingsRows: View {
-    @Environment(DictationCoordinator.self) private var coordinator
-    @Environment(AppSettings.self) private var settings
-    @State private var size: Int64?
-    @State private var attribution: [AttributionFile] = []
-    @State private var showsAttribution = false
-
-    var body: some View {
-        @Bindable var settings = settings
-        let models = coordinator.models
-        Group {
-            LabeledContent {
-                if models.importing {
-                    ProgressView("Importing…")
-                        .controlSize(.small)
-                } else {
-                    if models.hasCustomModel {
-                        Button("Remove") { remove() }
-                            .settingsEnabled(!models.importing && !models.transcribing)
-                    }
-                    Button("Import…") { importModel() }
-                        .settingsEnabled(!models.importing && !models.transcribing)
-                }
-            } label: {
-                SettingsRowTitle(.dictationModel, "Custom model")
-                Text(status)
-            }
-            Toggle(isOn: $settings.dictationUsesCustomModel) {
-                SettingsRowTitle(.dictationModel, "Use custom model")
-            }
-            .settingsEnabled(models.hasCustomModel && !models.importing && !models.transcribing)
-            if !attribution.isEmpty {
-                DisclosureGroup(isExpanded: $showsAttribution) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                            ForEach(attribution) { file in
-                                Text(file.name)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                Text(file.text)
-                                    .font(.caption.monospaced())
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                        .padding(.vertical, Theme.Spacing.xs)
-                    }
-                    .frame(maxHeight: Self.attributionMaxHeight)
-                } label: {
-                    Text("Licenses and notices")
-                }
-            }
-        }
-        .task { await reload() }
-        .onChange(of: coordinator.models.hasCustomModel) { _, installed in
-            if installed {
-                Task { await reload() }
-            } else {
-                size = nil
-                attribution = []
-                showsAttribution = false
-            }
+    private func chooseCustomModel() {
+        Task { @MainActor in
+            guard
+                let url = FolderPicker.choose(
+                    message: String(localized: "Choose a folder containing a Parakeet Core ML model."),
+                    startingAt: FileManager.default.homeDirectoryForCurrentUser)
+            else { return }
+            await coordinator.importCustomModel(from: url)
+            if coordinator.models.hasCustomModel { settings.dictationUsesCustomModel = true }
         }
     }
 
-    private static let attributionMaxHeight: CGFloat = 200
-
-    private struct AttributionFile: Identifiable, Sendable {
-        let name: String
-        let text: String
-        var id: String { name }
-    }
-
-    private var status: String {
-        guard let installation = coordinator.models.customModel else {
-            return String(localized: "No custom model installed")
-        }
-        let name = installation.manifest.originalFolderName
-        guard let size else { return name }
-        return name + " · "
-            + String(
-                localized: "\(ByteCountFormatter.string(fromByteCount: size, countStyle: .file)) on disk")
-    }
-
-    private func importModel() {
-        guard
-            let url = FolderPicker.choose(
-                message: String(localized: "Choose a folder containing a Parakeet Core ML model."),
-                startingAt: FileManager.default.homeDirectoryForCurrentUser)
-        else { return }
-        Task { await coordinator.importCustomModel(from: url) }
-    }
-
-    private func remove() {
+    private func removeCustomModel() {
         Task { await coordinator.removeCustomModel() }
-    }
-
-    private func reload() async {
-        let models = coordinator.models
-        guard models.hasCustomModel else {
-            size = nil
-            attribution = []
-            return
-        }
-        size = await models.customModelSize()
-        let directory = models.customModelDirectory
-        let names = DictationCustomModel.attributionFiles
-        attribution = await Task.detached(priority: .utility) {
-            names.compactMap { name in
-                guard
-                    let text = try? String(
-                        contentsOf: directory.appending(path: name), encoding: .utf8)
-                else { return nil }
-                return AttributionFile(name: name, text: text)
-            }
-        }.value
     }
 }
