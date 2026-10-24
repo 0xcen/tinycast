@@ -108,7 +108,7 @@ must hold `Preprocessor.mlmodelc`, `Decoder.mlmodelc`, `JointDecisionv3.mlmodelc
 `parakeet_vocab.json` and one encoder: `Encoder_lut3.mlmodelc` or `Encoder.mlmodelc`. When both
 encoders are present `Encoder_lut3` wins — it is the smaller, GPU-oriented variant, loaded with
 CPU/GPU, while `Encoder.mlmodelc` uses CPU/Neural Engine. Tinycast neither downloads nor ships any
-custom model; the folder is the user's own.
+custom model; the folder is the user's own, and any licence it carries is the user's concern.
 
 Importing copies the whole folder into this build's dictation cache and validates it there, so the
 original can be moved or deleted afterwards. The copy is staged as `.import-<uuid>`, the embedded
@@ -120,9 +120,6 @@ adapters; a helper that does not report within 120 seconds is terminated and the
 folder with a missing component, a load failure, a mismatched signature or an invalid vocabulary is
 rejected with a localized message and nothing is published.
 
-Attribution files the folder carries — `NOTICE`, `NOTICE.md`, `NOTICE.txt`, `README`, `README.md`,
-`README.txt`, `LICENSE`, `LICENSE.md`, `LICENSE.txt` — are shown in Settings.
-
 A crash can leave an import's `.import-<uuid>` staging folder or an `.import-old-<uuid>` backup
 behind. The next launch removes only dot-directories named with those UUID suffixes, leaving the
 installed model and every other file alone, and a new import waits for that cleanup before staging.
@@ -133,16 +130,12 @@ A custom model is decoded with non-text-token filtering: it drops vocabulary tok
 piece is `<unk>`, any piece beginning `<|`, and the named specials `<pad>`, `<blank>`, `<s>` and
 `</s>`. The built-in Parakeet Ultra and Redux models keep their previous token handling.
 
-The "Use custom model" toggle selects the imported model for transcription; it is disabled until one
-is installed and while an import or transcription is running. "Remove" deletes Tinycast's copy and
-clears the toggle. The copy lives under the same bundle-ID cache as downloaded models, so macOS may
-purge it; a purged custom model disappears from Settings and must be imported again.
-
-Bark 3.0 Clean is the tested example: the `bark-3.0-clean` conversion from
-[FluidInference/bark-3.0-coreml](https://huggingface.co/FluidInference/bark-3.0-coreml) matches this
-layout, and its source model
-[ConwayResearch/Underdog-Bark-3.0-Clean](https://huggingface.co/ConwayResearch/Underdog-Bark-3.0-Clean)
-is CC-BY-4.0.
+The Model dropdown lists "Custom…" while the Engine is Parakeet. Choosing it opens a folder picker;
+the imported model then appears in the dropdown under its source folder's name, and choosing
+"Custom…" again re-picks a folder to replace the installed model. The status row below the dropdown
+shows the folder's name and size with a "Remove" button that deletes Tinycast's copy. The copy lives
+under the same bundle-ID cache as downloaded models, so macOS may purge it; a purged custom model
+disappears from the dropdown and the selection falls back to the built-in model.
 
 ## Validation
 
