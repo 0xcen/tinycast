@@ -667,15 +667,11 @@ final class TextInjector {
         guard setSelectedRange(target.replacementRange, in: target.element) else {
             return .unavailable
         }
-        guard
-            AXUIElementSetAttributeValue(
-                target.element,
-                kAXSelectedTextAttribute as CFString,
-                injected.text as CFString) == .success
-        else {
-            _ = setSelectedRange(target.originalRange, in: target.element)
-            return .unavailable
-        }
+        // The setter's answer is not evidence: Telegram applies the text and answers kAXErrorFailure.
+        _ = AXUIElementSetAttributeValue(
+            target.element,
+            kAXSelectedTextAttribute as CFString,
+            injected.text as CFString)
 
         var readbacks: [String?] = []
         for attempt in 0..<Self.writeConfirmationAttempts {

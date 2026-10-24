@@ -949,6 +949,21 @@ struct SnippetsTests {
                 replacementRange: NSRange(location: 0, length: 0),
                 insertedText: "text",
                 readbacks: Array(repeating: "", count: 29) + ["text"]) == .delivered)
+        check(
+            "a setter error whose write landed is delivered and never falls back to events",
+            erroredWriteOutcome(["PROBE_OK"]) == .delivered
+                && !AccessibilityReplacement.delivered.fallsBackToEvents)
+        check(
+            "a setter error whose write did not land stays unavailable and falls back to events",
+            erroredWriteOutcome(["!tcprobe", "!tcprobe"]) == .unavailable
+                && AccessibilityReplacement.unavailable.fallsBackToEvents)
+        check(
+            "a setter error with an unreadable value fails closed instead of retyping",
+            erroredWriteOutcome([nil]) == .rejected
+                && !AccessibilityReplacement.rejected.fallsBackToEvents)
+        check(
+            "a setter error whose write lands late is delivered on the later read",
+            erroredWriteOutcome(["!tcprobe", "!tcprobe", "PROBE_OK"]) == .delivered)
 
         check(
             "a Unicode keystroke never carries more than Blink's four-unit cap",
@@ -2076,6 +2091,15 @@ struct SnippetsTests {
         while ContinuousClock.now < deadline, !condition() {
             try? await Task.sleep(for: .milliseconds(10))
         }
+    }
+
+    /// A setter error is not evidence: Telegram answers kAXErrorFailure and still applies the text.
+    private static func erroredWriteOutcome(_ readbacks: [String?]) -> AccessibilityReplacement {
+        TextReplacementPolicy.outcomeAfterWrite(
+            originalValue: "!tcprobe",
+            replacementRange: NSRange(location: 0, length: 8),
+            insertedText: "PROBE_OK",
+            readbacks: readbacks)
     }
 
     private static func check(_ description: String, _ condition: @autoclosure () -> Bool) {
