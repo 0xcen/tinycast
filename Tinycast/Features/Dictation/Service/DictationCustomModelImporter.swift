@@ -22,7 +22,8 @@ struct DictationCustomModelImporter: Sendable {
         let staging = root.appending(path: ".import-\(UUID().uuidString)")
         do {
             try manager.createDirectory(at: staging, withIntermediateDirectories: true)
-            try copyContents(of: source, into: staging, using: manager)
+            let kept = DictationCustomModel.installableFiles(encoder: encoder)
+            try copyContents(of: source, into: staging, keeping: kept, using: manager)
             let report = try validate(staging)
             guard report.ok else { throw DictationCustomModelError.invalid(report) }
             let manifest = DictationCustomModel.Manifest(originalFolderName: source.lastPathComponent)
@@ -60,8 +61,10 @@ struct DictationCustomModelImporter: Sendable {
         }
     }
 
-    private func copyContents(of source: URL, into destination: URL, using manager: FileManager) throws {
-        for name in try manager.contentsOfDirectory(atPath: source.path) {
+    private func copyContents(
+        of source: URL, into destination: URL, keeping kept: Set<String>, using manager: FileManager
+    ) throws {
+        for name in try manager.contentsOfDirectory(atPath: source.path) where kept.contains(name) {
             try manager.copyItem(
                 at: source.appending(path: name), to: destination.appending(path: name))
         }

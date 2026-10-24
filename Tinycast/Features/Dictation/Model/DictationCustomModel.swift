@@ -6,6 +6,7 @@ enum DictationCustomModel {
     static let manifestFileName = "custom-model.json"
     static let vocabularyFileName = "parakeet_vocab.json"
     static let jointName = "JointDecisionv3"
+    static let noticeFileName = "NOTICE"
 
     static let requiredFiles: Set<String> = [
         "Preprocessor.mlmodelc", "Decoder.mlmodelc", "JointDecisionv3.mlmodelc", vocabularyFileName,
@@ -51,6 +52,11 @@ enum DictationCustomModel {
 
     static func encoder(in fileNames: Set<String>) -> Encoder? {
         Encoder.allCases.first { fileNames.contains($0.rawValue) }
+    }
+
+    /// What an import keeps from a source folder: the required set, the chosen encoder and any NOTICE.
+    static func installableFiles(encoder: Encoder) -> Set<String> {
+        requiredFiles.union([encoder.rawValue, noticeFileName])
     }
 
     static func missingFiles(in fileNames: Set<String>) -> [String] {

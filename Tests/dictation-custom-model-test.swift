@@ -53,6 +53,14 @@ struct DictationCustomModelTest {
         checkEqual(
             DictationCustomModel.encoder(in: []), nil, "An absent encoder was detected")
         checkEqual(
+            DictationCustomModel.installableFiles(encoder: .standard),
+            DictationCustomModel.requiredFiles.union(["Encoder.mlmodelc", "NOTICE"]),
+            "The standard installable set is wrong")
+        checkEqual(
+            DictationCustomModel.installableFiles(encoder: .lut3),
+            DictationCustomModel.requiredFiles.union(["Encoder_lut3.mlmodelc", "NOTICE"]),
+            "The lut3 installable set is wrong")
+        checkEqual(
             DictationCustomModel.Encoder.lut3.computeUnits, .cpuAndGPU,
             "The lut3 encoder did not prefer the GPU")
         checkEqual(

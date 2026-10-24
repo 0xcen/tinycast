@@ -154,12 +154,15 @@ struct DictationWorkerTest {
         }
         let source = root.appending(path: "bark-3.0-clean")
         let layout = DictationCustomModel.requiredFiles.union([
-            DictationCustomModel.Encoder.lut3.rawValue
+            DictationCustomModel.Encoder.standard.rawValue,
+            DictationCustomModel.Encoder.lut3.rawValue,
         ])
         try manager.createDirectory(at: source, withIntermediateDirectories: true)
         for name in layout { try Data([0]).write(to: source.appending(path: name)) }
         try Data(#"{"0":"<unk>","1":"hello","2":"world"}"#.utf8)
             .write(to: source.appending(path: DictationCustomModel.vocabularyFileName))
+        try Data([0]).write(to: source.appending(path: DictationCustomModel.noticeFileName))
+        try Data([0]).write(to: source.appending(path: "junk.bin"))
         try await store.importCustomModel(from: source)
         guard !manager.fileExists(atPath: stale.path), manager.fileExists(atPath: kept.path) else {
             fatalError("Interrupted import cleanup removed the wrong staging folders")
@@ -167,11 +170,11 @@ struct DictationWorkerTest {
         guard
             let installation = store.customModel,
             installation.manifest.originalFolderName == "bark-3.0-clean",
-            installation.encoder == .lut3,
+            installation.encoder == .standard,
             store.hasCustomModel,
             let configuration = store.customConfiguration,
-            configuration.encoder == "Encoder_lut3",
-            configuration.encoderUsesGPU,
+            configuration.encoder == "Encoder",
+            !configuration.encoderUsesGPU,
             configuration.blankToken == 3,
             configuration.stripsNonTextTokens,
             configuration.joint == DictationCustomModel.jointName
@@ -185,6 +188,16 @@ struct DictationWorkerTest {
             manager.fileExists(atPath: source.appending(path: "Preprocessor.mlmodelc").path)
         else {
             fatalError("Import did not publish a manifest or touched the source")
+        }
+        guard
+            manager.fileExists(
+                atPath: published.appending(path: DictationCustomModel.Encoder.standard.rawValue).path),
+            !manager.fileExists(
+                atPath: published.appending(path: DictationCustomModel.Encoder.lut3.rawValue).path),
+            manager.fileExists(atPath: published.appending(path: DictationCustomModel.noticeFileName).path),
+            !manager.fileExists(atPath: published.appending(path: "junk.bin").path)
+        else {
+            fatalError("Import did not copy exactly the winning encoder package")
         }
         guard await store.customModelSize() != nil else {
             fatalError("The custom model size was not reported")
