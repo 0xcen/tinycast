@@ -48,8 +48,8 @@ struct DictationCustomModelTest {
             DictationCustomModel.encoder(in: ["Encoder.mlmodelc"]), .standard,
             "The standard encoder was not detected")
         checkEqual(
-            DictationCustomModel.encoder(in: ["Encoder.mlmodelc", "Encoder_lut3.mlmodelc"]), .lut3,
-            "The lut3 encoder did not win when both were present")
+            DictationCustomModel.encoder(in: ["Encoder.mlmodelc", "Encoder_lut3.mlmodelc"]), .standard,
+            "The standard encoder did not win when both were present")
         checkEqual(
             DictationCustomModel.encoder(in: []), nil, "An absent encoder was detected")
         checkEqual(

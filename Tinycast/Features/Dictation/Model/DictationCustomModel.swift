@@ -17,9 +17,9 @@ enum DictationCustomModel {
     }
 
     enum Encoder: String, CaseIterable, Sendable {
-        // Ordered deliberately: the smaller, GPU-oriented variant wins when both are present.
-        case lut3 = "Encoder_lut3.mlmodelc"
+        // Ordered deliberately: the ANE variant wins when both are present, for lower memory.
         case standard = "Encoder.mlmodelc"
+        case lut3 = "Encoder_lut3.mlmodelc"
 
         /// The `DictationModel.ParakeetConfiguration.encoder` value for this file.
         var baseName: String { String(rawValue.dropLast(".mlmodelc".count)) }
