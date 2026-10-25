@@ -73,6 +73,10 @@ compilation of its 2-bit weights; Ultra's encoder and both variants' decoder/joi
   land, then transcribes only the remainder. A cancelled chunk keeps its audio behind for that
   final pass, and a copy destination receives the assembled text. Chunk cuts fall near a
   quiet passage, like long recordings do, and copy-only sessions never start the live loop.
+  Audio whose peak short-window level stays below the speech floor is treated as no speech: the
+  final pass reports "No speech was recorded" or keeps already-inserted chunks, and a live flush
+  consumes the span without transcribing it, while a spoken "yeah" or "okay" above the floor still
+  inserts.
 - Every flush re-transcribes from a pause-anchored overlap start and drops the repeated head
   word-wise, tolerating fragment words and case or punctuation variants, so word splits at
   chunk cuts rarely duplicate. When the app exposes no caret, spacing and casing fall back to

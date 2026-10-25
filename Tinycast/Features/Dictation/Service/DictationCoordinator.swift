@@ -218,9 +218,9 @@ final class DictationCoordinator {
             // Queued chunks land first: reset would drop them, and the remainder spaces after them.
             if !liveText.isEmpty { await injector.drain() }
             guard token == current else { return }
-            let tail = liveOffset < samples.count ? Array(samples[liveOffset...]) : []
+            let start = min(liveOffset, samples.count)
             let destination = field == nil ? settings.dictationDestination : .paste
-            if tail.count < 1_600 {
+            guard DictationAudioChunks.hasSpeech(in: samples, from: start, to: samples.count) else {
                 if liveText.isEmpty {
                     reset(cancelTranscription: false)
                     showMessage(String(localized: "No speech was recorded"), .danger)
@@ -229,6 +229,7 @@ final class DictationCoordinator {
                 }
                 return
             }
+            let tail = Array(samples[start...])
             do {
                 let transcript = try await models.transcribe(
                     tail, target: target,
@@ -323,6 +324,10 @@ final class DictationCoordinator {
         else { return }
         let end = DictationAudioChunks.liveCut(in: snapshot, from: liveOffset, to: snapshot.count)
         guard end > liveOffset else { return }
+        guard DictationAudioChunks.hasSpeech(in: snapshot, from: liveOffset, to: end) else {
+            liveOffset = end
+            return
+        }
         let overlap = DictationAudioChunks.liveOverlapStart(in: snapshot, before: liveOffset)
         let segment = Array(snapshot[overlap..<end])
         do {
