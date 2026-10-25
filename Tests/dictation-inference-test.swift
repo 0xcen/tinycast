@@ -134,8 +134,32 @@ struct DictationInferenceTest {
         else {
             fatalError("Live insertion flushed speech without a pause, or silence as speech")
         }
+        let digitalSilence = [Float](repeating: 0, count: 16_000)
+        let roomTone = [Float](repeating: 0.002, count: 16_000)
+        var shortWord = [Float](repeating: 0, count: 16_000)
+        for index in 8_000..<12_800 { shortWord[index] = 0.15 }
+        var click = [Float](repeating: 0, count: 16_000)
+        click[100] = 0.25
+        let trailingWord = [Float](repeating: 0, count: 16_000) + [Float](repeating: 0.15, count: 4_800)
+        guard
+            !DictationAudioChunks.hasSpeech(in: digitalSilence, from: 0, to: digitalSilence.count),
+            !DictationAudioChunks.hasSpeech(in: roomTone, from: 0, to: roomTone.count),
+            DictationAudioChunks.hasSpeech(
+                in: [Float](repeating: 0.5, count: 16_000), from: 0, to: 16_000),
+            DictationAudioChunks.hasSpeech(
+                in: [Float](repeating: 0.008, count: 16_000), from: 0, to: 16_000),
+            DictationAudioChunks.hasSpeech(in: shortWord, from: 0, to: shortWord.count),
+            !DictationAudioChunks.hasSpeech(in: click, from: 0, to: click.count),
+            !DictationAudioChunks.hasSpeech(in: digitalSilence, from: 8_000, to: 8_000),
+            !DictationAudioChunks.hasSpeech(in: trailingWord, from: 0, to: 16_000),
+            DictationAudioChunks.hasSpeech(in: trailingWord, from: 0, to: trailingWord.count),
+            DictationAudioChunks.hasSpeech(
+                in: [Float](repeating: 0.5, count: 1_600), from: 0, to: 1_600)
+        else {
+            fatalError("Speech presence missed a word, passed room tone or ignored the requested span")
+        }
         print(
-            "Dictation scores, tokenizer, Fourier transform, mel features, listening bands, audio chunks and live cuts passed"
+            "Dictation scores, tokenizer, Fourier transform, mel features, listening bands, audio chunks, live cuts and speech presence passed"
         )
     }
 

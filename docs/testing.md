@@ -133,9 +133,9 @@ If a change touches anything in the right column, the harness on the left is man
 | `hotkey-dispatch-test` | `HotKeys/Service/HotKeyManager.swift` — Secure Input side isolation, shared Control registrations, press/release routing, recording and cancellation; isolated preferences and simulated Carbon registration |
 | `dictation-test` | `Dictation/Model/DictationModel.swift`, `DictationTextFormatter.swift` — model paths and text formatting |
 | `dictation-custom-model-test` | `Dictation/Model/DictationCustomModel.swift` — a custom folder's layout, encoder choice, vocabulary, token filtering, manifest and tensor signatures, including the Joint outputs' `[1, 1, 1]` shape; no Core ML |
-| `dictation-field-test` | Composer rebinding and teardown, field-scoped dictation cancellation, and queued insertion validity; synthetic capture and real AppKit editors |
+| `dictation-field-test` | Composer rebinding and teardown, field-scoped dictation cancellation, queued insertion validity, and the silence gate plus a short spoken word; synthetic capture and real AppKit editors |
 | `dictation-volume-test` | Volume recovery across fade steps, user changes, output switching, failed writes and cancellation; injected audio controls only |
-| `dictation-inference-test` | Dictation byte BPE, Fourier/mel features and non-overlapping audio chunks; no downloaded models |
+| `dictation-inference-test` | Dictation byte BPE, Fourier/mel features, non-overlapping audio chunks and speech presence; no downloaded models |
 | `dictation-worker-test` | Dictation's framed channel, worker reuse/switching, removal, cancellation and broken pipes with a fixture helper |
 | `fallback-test` | `Launcher/Model/Fallback.swift`, plus the `CommandID` and `Quicklink` ids it is built from |
 | `dictionary-test` | `Dictionary/Model/DictionaryEntry.swift`, `DictionaryMarkup.swift` — a real XHTML record and the plain-text fallback, read into page blocks |

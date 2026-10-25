@@ -15,6 +15,9 @@ struct DictationFieldTest {
         try await testLiveDeliveryFailure()
         try await testQueuedLiveChunk(cancelling: false)
         try await testQueuedLiveChunk(cancelling: true)
+        try await testSilentAccept()
+        try await testSilentLiveFlush()
+        try await testShortSpokenYeahInserts()
         print("ALL PASSED")
     }
 
@@ -195,6 +198,46 @@ struct DictationFieldTest {
         expect(fixture.messages.isEmpty, "A chunk dropped by cancelling never fails the next session")
     }
 
+    private static func testSilentAccept() async throws {
+        let fixture = Fixture()
+        let editor = ComposerTextView()
+        try await fixture.start(into: editor)
+        fixture.capture.stopSamples = [Float](repeating: 0, count: 16_000)
+        fixture.coordinator.accept()
+        try await wait { fixture.coordinator.field == nil }
+        expect(editor.string.isEmpty, "Silence inserts nothing")
+        expect(fixture.messages == ["No speech was recorded"], "Silence reports no speech")
+        expect(fixture.models.pending == nil, "Silence never reaches the model")
+    }
+
+    private static func testSilentLiveFlush() async throws {
+        let fixture = Fixture()
+        fixture.settings.dictationLiveInsertion = true
+        let editor = ComposerTextView()
+        try await fixture.start(into: editor)
+        fixture.capture.snapshotSamples = [Float](repeating: 0, count: 48_000)
+        fixture.capture.stopSamples = [Float](repeating: 0, count: 16_000)
+        let afterPoll = ContinuousClock.now + .seconds(2.4)
+        try await waitLong { ContinuousClock.now >= afterPoll }
+        expect(fixture.models.pending == nil, "A silent live span is consumed without transcribing")
+        fixture.coordinator.accept()
+        try await wait { fixture.coordinator.field == nil }
+        expect(editor.string.isEmpty, "A silent session inserts nothing")
+        expect(fixture.messages == ["No speech was recorded"], "A silent session reports no speech")
+    }
+
+    private static func testShortSpokenYeahInserts() async throws {
+        let fixture = Fixture()
+        let editor = ComposerTextView()
+        try await fixture.start(into: editor)
+        fixture.capture.stopSamples = [Float](repeating: 0.15, count: 4_800)
+        fixture.coordinator.accept()
+        try await wait { fixture.models.pending != nil }
+        fixture.models.finish("yeah")
+        try await wait { fixture.coordinator.field == nil }
+        expect(editor.string.lowercased() == "yeah", "A short spoken word still inserts")
+    }
+
     /// The live poll sleeps longer than `wait` allows.
     private static func waitLong(until condition: () -> Bool) async throws {
         let deadline = ContinuousClock.now + .seconds(8)
@@ -342,10 +385,11 @@ final class DictationCapture {
     func start(microphoneID: String?) async throws { isRecording = true }
     var snapshotSamples: [Float] = []
     func snapshot() -> [Float] { snapshotSamples }
+    var stopSamples: [Float]?
     func stop() async -> [Float] {
         isRecording = false
         stopCount += 1
-        return [Float](repeating: 0, count: 1_600)
+        return stopSamples ?? [Float](repeating: 0.5, count: 1_600)
     }
 }
 
