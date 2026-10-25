@@ -7,6 +7,10 @@ enum DictationAudioChunks {
     static let maximumLiveSamples = 8 * 16_000
     /// Audio re-transcribed with every flush so word splits at the cut rarely duplicate.
     static let liveOverlapSamples = 32_000
+    /// The window speech presence is measured over; 0.2 s at 16 kHz.
+    static let speechWindowSamples = 3_200
+    /// Window RMS a quiet speaker still clears and room tone does not; the one calibration knob.
+    static let speechMinimumLevel: Float = 0.005
 
     static func liveOverlapStart(in samples: [Float], before start: Int) -> Int {
         precondition(start >= 0 && start <= samples.count)
@@ -64,6 +68,21 @@ enum DictationAudioChunks {
         }
         guard count > 0 else { return false }
         return tail / Float(count) <= peak * 0.05
+    }
+
+    /// Peak short-window level, so one 0.2 s word is not averaged away by surrounding silence.
+    static func hasSpeech(in samples: [Float], from start: Int, to end: Int) -> Bool {
+        precondition(start >= 0 && start <= end && end <= samples.count)
+        guard end > start else { return false }
+        let window = min(speechWindowSamples, end - start)
+        var peak: Float = 0
+        var offset = start
+        while offset + window <= end {
+            let sum = samples[offset..<(offset + window)].reduce(Float.zero) { $0 + $1 * $1 }
+            peak = max(peak, (sum / Float(window)).squareRoot())
+            offset += max(1, window / 2)
+        }
+        return peak >= speechMinimumLevel
     }
 
     static func ranges(in samples: [Float], maximum: Int) -> [Range<Int>] {
