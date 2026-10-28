@@ -1,3 +1,4 @@
+import CoreServices
 import Foundation
 
 @main
@@ -35,6 +36,7 @@ struct FileIndexTests {
         layout(snapshot, root: root.path)
         search(index, root: root.path)
         try live(index, root: root, policy: policy)
+        eventPolicy()
 
         print(failures == 0 ? "File index tests passed" : "\(failures) file index tests failed")
         exit(failures == 0 ? 0 : 1)
@@ -149,6 +151,44 @@ struct FileIndexTests {
         expect(
             !index.apply(folder: developer.path + "/application/node_modules"),
             "an event in a skipped folder is ignored")
+    }
+
+    static func eventPolicy() {
+        let path = "/Users/me/Documents"
+        let mustScan = FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs)
+        let rootChanged = FSEventStreamEventFlags(kFSEventStreamEventFlagRootChanged)
+        let idsWrapped = FSEventStreamEventFlags(kFSEventStreamEventFlagEventIdsWrapped)
+        let historyDone = FSEventStreamEventFlags(kFSEventStreamEventFlagHistoryDone)
+
+        expect(
+            FileIndexEventPolicy.action(path: path, flags: mustScan)
+                == .some(.relist(path: path, recursive: true)),
+            "MustScan relists recursively, never rebuilds")
+        expect(
+            FileIndexEventPolicy.action(path: path, flags: 0)
+                == .some(.relist(path: path, recursive: false)),
+            "a plain event relists one folder")
+        expect(
+            FileIndexEventPolicy.action(path: "/Users/me", flags: mustScan)
+                == .some(.relist(path: "/Users/me", recursive: true)),
+            "MustScan at a root relists rather than rebuilds")
+        expect(
+            FileIndexEventPolicy.action(path: path + "/", flags: 0)
+                == .some(.relist(path: path, recursive: false)),
+            "a trailing slash is dropped")
+        expect(
+            FileIndexEventPolicy.action(path: path, flags: rootChanged) == .some(.rebuild),
+            "a moved root rebuilds")
+        expect(
+            FileIndexEventPolicy.action(path: path, flags: idsWrapped) == .some(.rebuild),
+            "an event-id wrap rebuilds")
+        expect(
+            FileIndexEventPolicy.action(path: path, flags: mustScan | rootChanged)
+                == .some(.rebuild),
+            "a lost root outranks a recursive relist")
+        expect(
+            FileIndexEventPolicy.action(path: path, flags: historyDone) == nil,
+            "the history-done marker is ignored")
     }
 
     static func names(

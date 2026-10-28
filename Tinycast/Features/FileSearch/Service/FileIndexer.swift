@@ -25,6 +25,7 @@ final class FileIndexer {
     @ObservationIgnored private var buildTask: Task<Void, Never>?
     @ObservationIgnored private var liveRefresh: Task<Void, Never>?
     @ObservationIgnored private var isRecentStale = false
+    private static let rebuildDebounce = Duration.seconds(60)
     @ObservationIgnored private let directory = AppPaths.applicationSupport()
         .appending(path: "FileIndex", directoryHint: .isDirectory)
     @ObservationIgnored private let events = DispatchQueue(
@@ -122,7 +123,7 @@ final class FileIndexer {
         let apply: @Sendable ([FileSystemWatcher.Event]) -> Void = { [weak self] batch in
             let countBefore = index.itemCount
             let recentBefore = index.recentRevision
-            let needsRebuild = Self.handle(batch, roots: roots, index: index)
+            let needsRebuild = Self.handle(batch, index: index)
             let recentChanged = index.recentRevision != recentBefore
             // Most batches touch neither the count nor Recent, and need no trip to the main actor.
             guard needsRebuild || recentChanged || index.itemCount != countBefore else { return }
@@ -139,22 +140,18 @@ final class FileIndexer {
     }
 
     private nonisolated static func handle(
-        _ batch: [FileSystemWatcher.Event], roots: [String], index: FileIndex
+        _ batch: [FileSystemWatcher.Event], index: FileIndex
     ) -> Bool {
         var folders: [String: Bool] = [:]
-        for event in batch where !event.has(kFSEventStreamEventFlagHistoryDone) {
-            if event.has(kFSEventStreamEventFlagRootChanged)
-                || event.has(kFSEventStreamEventFlagEventIdsWrapped)
-            {
+        for event in batch {
+            guard let action = FileIndexEventPolicy.action(path: event.path, flags: event.flags)
+            else { continue }
+            switch action {
+            case .rebuild:
                 return true
+            case .relist(let path, let recursive):
+                folders[path] = (folders[path] ?? false) || recursive
             }
-            var path = event.path
-            if path.count > 1, path.hasSuffix("/") { path.removeLast() }
-            let recursive = event.has(kFSEventStreamEventFlagMustScanSubDirs)
-            if recursive, roots.contains(where: { FileSearchScope.contains(path, $0) }) {
-                return true
-            }
-            folders[path] = (folders[path] ?? false) || recursive
         }
         return Signposts.interval("FileIndexer.update") {
             var needsRebuild = false
@@ -165,9 +162,10 @@ final class FileIndexer {
         }
     }
 
+    /// A rebuild replays a backlog, so a watcher request waits a minute; Settings stays immediate.
     private func requestRebuild() {
         guard buildTask == nil else { return }
-        build(after: .zero)
+        build(after: Self.rebuildDebounce)
     }
 
     /// At most once a second, so a burst of disk activity redraws the count and Recent once.

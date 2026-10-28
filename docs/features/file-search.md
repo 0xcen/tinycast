@@ -130,8 +130,10 @@ matters on macOS 27, where malloc keeps freed small blocks dirty: replaying a la
 per-row Strings left about 30 MB behind, and the merge keeps a cold start level with Spotlight's.
 The diff reads a copy of the state that is released before its result is written, so writing never
 copies the overlay: holding that copy across the write cost 1.7 ms per change at 30,000 overlay entries.
-`MustScanSubDirs` rescans a folder recursively. History loss at or above a root, a moved root or more
-than 100,000 changes since the snapshot trigger a background rebuild.
+`MustScanSubDirs` rescans that folder recursively, a root included — it is never a reason to rebuild
+the whole index. Only a moved root, a wrapped event id or more than 100,000 changes since the snapshot
+triggers a rebuild, and a rebuild request is held for a minute so replaying the backlog cannot loop one
+rebuild into the next.
 
 ## Type filter
 

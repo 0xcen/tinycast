@@ -603,6 +603,7 @@
 		B277075C16A5641C8F3E58C6 /* CameraAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DD86B3ABBB71BC6EA116D85 /* CameraAccess.swift */; };
 		B374B57D0E9D902AF877153D /* MCPHTTPTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FD57D9B2C6C46B5ADDDE173 /* MCPHTTPTransport.swift */; };
 		B40434D581183863A23D7E86 /* DictionaryCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7DE05BCC5E8CD91E8B0A26E /* DictionaryCoordinator.swift */; };
+		B46FBB77B0936E691206D78E /* FileIndexEventPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD144716529901FC4A77EDF7 /* FileIndexEventPolicy.swift */; };
 		B566FC125D9D193F234EC1AB /* ExtensionFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 988EA3698EA86BA53590C24E /* ExtensionFetcher.swift */; };
 		B568B2DB072831116AA95767 /* WindowLayoutsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF202236034AB044CA846B60 /* WindowLayoutsSection.swift */; };
 		B56F252262AA1BD3E2631F0C /* FileSearchQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 391B8024E8719506361B45F7 /* FileSearchQuery.swift */; };
@@ -1637,6 +1638,7 @@
 		DB74C73EB33F368E0890E839 /* ClipDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipDrag.swift; sourceTree = "<group>"; };
 		DBED1FDAAD4735FDB4B2453A /* MCPProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPProtocol.swift; sourceTree = "<group>"; };
 		DD13EDD2115B31C790C8646C /* ChatChoices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatChoices.swift; sourceTree = "<group>"; };
+		DD144716529901FC4A77EDF7 /* FileIndexEventPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileIndexEventPolicy.swift; sourceTree = "<group>"; };
 		DD693A155FCBDA6315C59330 /* RoomPickerList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomPickerList.swift; sourceTree = "<group>"; };
 		DD8CDDBAC59480E1A7559278 /* ExtensionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionManager.swift; sourceTree = "<group>"; };
 		DDE8B48420B83D612E01603A /* MarkdownBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownBlock.swift; sourceTree = "<group>"; };
@@ -1932,6 +1934,7 @@
 		16BFB2AB49971CB4C8CECC69 /* Model */ = {
 			isa = PBXGroup;
 			children = (
+				DD144716529901FC4A77EDF7 /* FileIndexEventPolicy.swift */,
 				EE21578FB7500CB744855654 /* FileSearchFilter.swift */,
 				CBFF39C46E98D0808B188E2E /* FileSearchIgnoreList.swift */,
 				8FC86115B040B8C574EAD0B5 /* FileSearchPolicy.swift */,
@@ -4333,6 +4336,7 @@
 				E4C6F315EA0F0544D9E4BB08 /* FileIconStamp.swift in Sources */,
 				6113732E52934F636791EBB2 /* FileIndex.swift in Sources */,
 				C6D759F2F0ADBF05285F708A /* FileIndexCrawler.swift in Sources */,
+				B46FBB77B0936E691206D78E /* FileIndexEventPolicy.swift in Sources */,
 				034473B26535154C38E22A28 /* FileIndexSnapshot.swift in Sources */,
 				44A3046B5651CDBF82223952 /* FileIndexer.swift in Sources */,
 				179E0788DCA9995D5B858366 /* FilePreviewStage.swift in Sources */,
